@@ -10,10 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { loginSchema, type LoginFormData } from "@/lib/validations/auth";
+import { authService } from "@/lib/api";
+import { useAuth } from "@/components/auth";
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const router = useRouter();
+  const { refreshAuth } = useAuth();
 
   const {
     register,
@@ -28,18 +32,36 @@ export function LoginForm() {
   });
 
   async function onSubmit(data: LoginFormData) {
-    // TODO: Implement actual login logic with API
-    console.log("Login attempt:", data);
+    setApiError(null);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const response = await authService.login({
+      email: data.email,
+      password: data.password,
+    });
 
-    // Redirect to dashboard after successful login
+    if (response.error) {
+      setApiError(response.error);
+      return;
+    }
+
+    if (!response.data?.success) {
+      setApiError("Login failed. Please try again.");
+      return;
+    }
+
+    // Refresh auth state and redirect to dashboard
+    refreshAuth();
     router.push("/dashboard");
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {apiError && (
+        <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg">
+          {apiError}
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input

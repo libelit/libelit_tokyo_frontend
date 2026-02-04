@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Logo } from "@/components/shared/logo";
 import { navigationConfig } from "@/config/navigation";
 import { useState } from "react";
+import { useAuth } from "@/components/auth";
 
 function NavGroup({
   items,
@@ -47,9 +48,10 @@ function NavGroup({
 
 function UserProfile() {
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const handleLogout = () => {
-    // TODO: Add actual logout logic (clear tokens, session, etc.)
+    logout();
     router.push("/login");
   };
 
@@ -59,8 +61,10 @@ function UserProfile() {
         <User className="h-5 w-5 text-white" />
       </div>
       <div className="flex flex-col flex-1">
-        <span className="text-sm font-medium text-gray-900">Superfund</span>
-        <span className="text-xs">Investor</span>
+        <span className="text-sm font-medium text-gray-900">
+          {user?.name || "User"}
+        </span>
+        <span className="text-xs capitalize">{user?.type || "Investor"}</span>
       </div>
       <button
         onClick={handleLogout}
