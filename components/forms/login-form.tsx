@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
@@ -12,6 +13,7 @@ import { loginSchema, type LoginFormData } from "@/lib/validations/auth";
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
 
   const {
     register,
@@ -31,6 +33,9 @@ export function LoginForm() {
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Redirect to dashboard after successful login
+    router.push("/dashboard");
   }
 
   return (

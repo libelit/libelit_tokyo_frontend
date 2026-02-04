@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
@@ -25,6 +26,7 @@ const accountTypes = [
 
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
 
   const {
     register,
@@ -49,6 +51,9 @@ export function RegisterForm() {
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Redirect to dashboard after successful registration
+    router.push("/dashboard");
   }
 
   return (
