@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, User, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,13 @@ function NavGroup({
 }
 
 function UserProfile() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // TODO: Add actual logout logic (clear tokens, session, etc.)
+    router.push("/login");
+  };
+
   return (
     <div className="flex items-center gap-3 px-3 py-3">
       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#909FAD]">
@@ -55,7 +62,10 @@ function UserProfile() {
         <span className="text-sm font-medium text-gray-900">Superfund</span>
         <span className="text-xs">Investor</span>
       </div>
-      <button className="p-2 hover:bg-white/50 rounded-lg transition-colors cursor-pointer">
+      <button
+        onClick={handleLogout}
+        className="p-2 hover:bg-white/50 rounded-lg transition-colors cursor-pointer"
+      >
         <LogOut className="h-5 w-5 text-black" />
       </button>
     </div>

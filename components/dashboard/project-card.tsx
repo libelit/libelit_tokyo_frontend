@@ -34,7 +34,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
   };
 
   return (
-    <Card className="overflow-hidden border shadow-sm">
+    <Card className="overflow-hidden shadow-none border-none">
       <CardContent className="space-y-3">
         <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
           {project.imageUrl ? (
