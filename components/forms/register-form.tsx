@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
+import { authService } from "@/lib/api";
 
 const accountTypes = [
   { value: "investor", label: "Investor" },
@@ -26,6 +27,7 @@ const accountTypes = [
 
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const router = useRouter();
 
   const {
@@ -46,18 +48,38 @@ export function RegisterForm() {
   });
 
   async function onSubmit(data: RegisterFormData) {
-    // TODO: Implement actual registration logic with API
-    console.log("Register attempt:", data);
+    setApiError(null);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const response = await authService.register({
+      name: data.companyName,
+      email: data.email,
+      password: data.password,
+      password_confirmation: data.password,
+      type: data.accountType,
+    });
 
-    // Redirect to dashboard after successful registration
-    router.push("/dashboard");
+    if (response.error) {
+      setApiError(response.error);
+      return;
+    }
+
+    if (!response.data?.success) {
+      setApiError("Registration failed. Please try again.");
+      return;
+    }
+
+    // Registration successful, redirect to login page
+    router.push("/login");
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      {apiError && (
+        <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg">
+          {apiError}
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="companyName">Company Name</Label>
         <Input

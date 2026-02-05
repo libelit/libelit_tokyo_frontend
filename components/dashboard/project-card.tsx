@@ -42,7 +42,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
               src={project.imageUrl}
               alt={project.name}
               fill
-              className="object-cover"
+              className="w-fit"
             />
           ) : (
             <div className="flex h-full items-center justify-center">

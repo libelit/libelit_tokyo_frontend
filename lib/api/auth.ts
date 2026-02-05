@@ -28,18 +28,18 @@ export interface LoginResponse {
 }
 
 export interface RegisterRequest {
-  companyName: string;
+  name: string;
   email: string;
   password: string;
-  accountType: string;
+  password_confirmation: string;
+  type: string;
 }
 
 export interface RegisterResponse {
   success: boolean;
+  message: string;
   data: {
     user: User;
-    access_token: string;
-    expires_at: number;
   };
 }
 
@@ -66,15 +66,7 @@ export const authService = {
 
   async register(data: RegisterRequest): Promise<ApiResponse<RegisterResponse>> {
     const response = await apiClient.post<RegisterResponse>("/register", data);
-
-    // Store token and user if registration successful
-    if (response.data?.success && response.data?.data && typeof window !== "undefined") {
-      const { access_token, user, expires_at } = response.data.data;
-      localStorage.setItem(AUTH_TOKEN_KEY, access_token);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-      localStorage.setItem(AUTH_EXPIRES_KEY, expires_at.toString());
-    }
-
+    // Register API doesn't return a token, user needs to login after registration
     return response;
   },
 
