@@ -11,16 +11,33 @@ interface AuthGuardProps {
 // Routes that don't require authentication
 const publicRoutes = ["/login", "/register", "/forgot-password"];
 
+// Routes for specific user types
+const investorRoutes = ["/dashboard"];
+const developerRoutes = ["/developer"];
+
+function getDashboardPath(userType: string): string {
+  return userType === "developer" ? "/developer/dashboard" : "/dashboard";
+}
+
+function isCorrectDashboard(pathname: string, userType: string): boolean {
+  if (userType === "developer") {
+    return pathname.startsWith("/developer");
+  }
+  // Investor should not access developer routes
+  return !pathname.startsWith("/developer");
+}
+
 export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
     const checkAuth = () => {
       const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
       const isUserAuthenticated = authService.isAuthenticated();
+      const user = authService.getUser();
 
       if (!isPublicRoute && !isUserAuthenticated) {
         // Not authenticated and trying to access protected route
@@ -28,13 +45,23 @@ export function AuthGuard({ children }: AuthGuardProps) {
         return;
       }
 
-      if (isPublicRoute && isUserAuthenticated) {
+      if (isPublicRoute && isUserAuthenticated && user) {
         // Already authenticated and trying to access public route (login/register)
-        router.push("/dashboard");
+        // Redirect to appropriate dashboard based on user type
+        router.push(getDashboardPath(user.type));
         return;
       }
 
-      setIsAuthenticated(isUserAuthenticated || isPublicRoute);
+      if (isUserAuthenticated && user && !isPublicRoute) {
+        // Check if user is accessing the correct dashboard
+        if (!isCorrectDashboard(pathname, user.type)) {
+          // Redirect to correct dashboard
+          router.push(getDashboardPath(user.type));
+          return;
+        }
+      }
+
+      setIsAuthorized(isUserAuthenticated || isPublicRoute);
       setIsLoading(false);
     };
 
@@ -49,7 +76,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  if (!isAuthenticated && !publicRoutes.some(route => pathname.startsWith(route))) {
+  if (!isAuthorized && !publicRoutes.some(route => pathname.startsWith(route))) {
     return null;
   }
 

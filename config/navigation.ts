@@ -1,40 +1,8 @@
-import {
-  Home,
-  Wallet,
-  Store,
-  PieChart,
-  TrendingDown,
-  BookOpen,
-  Settings,
-  Layout,
-  LucideIcon,
-} from "lucide-react";
+// Re-export types and configs from specific files
+export type { NavItem, NavGroup } from "./navigation-investor";
+export { investorNavigationConfig } from "./navigation-investor";
+export { developerNavigationConfig } from "./navigation-developer";
 
-export interface NavItem {
-  title: string;
-  href: string;
-  icon: LucideIcon;
-}
-
-export interface NavGroup {
-  items: NavItem[];
-}
-
-export const navigationConfig: NavGroup[] = [
-  {
-    items: [
-      { title: "Home", href: "/dashboard", icon: Home },
-      { title: "Wallet", href: "/dashboard/wallet", icon: Wallet },
-      { title: "Marketplace", href: "/dashboard/marketplace", icon: Store },
-      { title: "Portfolio", href: "/dashboard/portfolio", icon: PieChart },
-      { title: "Drawdown", href: "/dashboard/drawdown", icon: TrendingDown },
-    ],
-  },
-  {
-    items: [
-      { title: "Know-how", href: "/dashboard/know-how", icon: BookOpen },
-      { title: "Settings", href: "/dashboard/settings", icon: Settings },
-      { title: "Landing page", href: "/", icon: Layout },
-    ],
-  },
-];
+// Default export for backward compatibility (investor config)
+import { investorNavigationConfig } from "./navigation-investor";
+export const navigationConfig = investorNavigationConfig;

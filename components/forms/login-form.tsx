@@ -49,9 +49,16 @@ export function LoginForm() {
       return;
     }
 
-    // Refresh auth state and redirect to dashboard
+    // Refresh auth state
     refreshAuth();
-    router.push("/dashboard");
+
+    // Redirect based on user type
+    const userType = response.data.data.user.type;
+    if (userType === "developer") {
+      router.push("/developer/dashboard");
+    } else {
+      router.push("/dashboard");
+    }
   }
 
   return (
