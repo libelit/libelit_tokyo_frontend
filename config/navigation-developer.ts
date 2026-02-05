@@ -7,6 +7,7 @@ import {
   BookOpen,
   Settings,
   Layout,
+  ShieldCheck,
   LucideIcon,
 } from "lucide-react";
 
@@ -24,6 +25,7 @@ export const developerNavigationConfig: NavGroup[] = [
   {
     items: [
       { title: "Home", href: "/developer/dashboard", icon: Home },
+      { title: "KYB Verification", href: "/developer/dashboard/kyb", icon: ShieldCheck },
       { title: "Projects", href: "/developer/dashboard/projects", icon: Building2 },
       { title: "Funding", href: "/developer/dashboard/funding", icon: FolderKanban },
       { title: "Analytics", href: "/developer/dashboard/analytics", icon: BarChart3 },
