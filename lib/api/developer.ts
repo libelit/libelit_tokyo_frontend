@@ -41,11 +41,25 @@ export const kybService = {
     data: UploadDocumentRequest
   ): Promise<ApiResponse<DocumentResponse>> {
     const formData = new FormData();
-    formData.append("document_type", data.document_type);
-    formData.append("title", data.title);
-    formData.append("file", data.file);
+    // Backend expects array format: documents[0][field]
+    formData.append("documents[0][document_type]", data.document_type);
+    formData.append("documents[0][title]", data.title);
+    formData.append("documents[0][file]", data.file);
 
-    return apiClient.upload<DocumentResponse>("/developer/kyb/documents", formData);
+    // Backend returns array, but we extract first document for single upload
+    const response = await apiClient.upload<DocumentListResponse>("/developer/kyb/documents", formData);
+
+    if (response.data?.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
+      return {
+        ...response,
+        data: {
+          success: response.data.success,
+          data: response.data.data[0], // Extract first document
+        },
+      };
+    }
+
+    return response as unknown as ApiResponse<DocumentResponse>;
   },
 
   async deleteDocument(id: number): Promise<ApiResponse<DeleteResponse>> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, ArrowLeft, Loader2, Eye } from "lucide-react";
 import Link from "next/link";
 import { DeveloperHeader } from "@/components/developer/developer-header";
 import { DocumentUploadCard, DocumentStatus } from "@/components/developer/document-upload-card";
@@ -18,6 +18,7 @@ interface KybDocument {
   required: boolean;
   status: DocumentStatus;
   fileName?: string;
+  fileUrl?: string;
   rejectionReason?: string;
 }
 
@@ -103,6 +104,7 @@ export default function KybVerificationPage() {
               required: config.required,
               status: mapVerificationStatus(uploadedDoc.verification_status),
               fileName: uploadedDoc.file_name,
+              fileUrl: uploadedDoc.file_url,
               rejectionReason: uploadedDoc.rejection_reason || undefined,
             };
           }
@@ -187,6 +189,7 @@ export default function KybVerificationPage() {
                   id: uploadedDoc.id,
                   status: "uploaded" as DocumentStatus,
                   fileName: uploadedDoc.file_name,
+                  fileUrl: uploadedDoc.file_url,
                 }
               : d
           )
@@ -513,21 +516,34 @@ export default function KybVerificationPage() {
                     <p className="text-sm text-gray-500">{doc.fileName}</p>
                   </div>
                 </div>
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    doc.status === "verified"
-                      ? "bg-green-100 text-green-700"
+                <div className="flex items-center gap-3">
+                  {doc.fileUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(doc.fileUrl, "_blank")}
+                      className="flex items-center gap-1"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View
+                    </Button>
+                  )}
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      doc.status === "verified"
+                        ? "bg-green-100 text-green-700"
+                        : doc.status === "rejected"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {doc.status === "verified"
+                      ? "Verified"
                       : doc.status === "rejected"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {doc.status === "verified"
-                    ? "Verified"
-                    : doc.status === "rejected"
-                    ? "Rejected"
-                    : "Pending"}
-                </span>
+                      ? "Rejected"
+                      : "Pending"}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
