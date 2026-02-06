@@ -38,6 +38,7 @@ export function RegisterForm() {
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      name: "",
       companyName: "",
       email: "",
       password: "",
@@ -51,7 +52,8 @@ export function RegisterForm() {
     setApiError(null);
 
     const response = await authService.register({
-      name: data.companyName,
+      name: data.name,
+      company_name: data.companyName,
       email: data.email,
       password: data.password,
       password_confirmation: data.password,
@@ -79,6 +81,22 @@ export function RegisterForm() {
           {apiError}
         </div>
       )}
+
+        <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+                id="name"
+                type="text"
+                placeholder="Enter your name"
+                disabled={isSubmitting}
+                autoComplete="organization"
+                className="py-6"
+                {...register("name")}
+            />
+            {errors.name && (
+                <p className="text-sm text-destructive">{errors.name.message}</p>
+            )}
+        </div>
 
       <div className="space-y-2">
         <Label htmlFor="companyName">Company Name</Label>
