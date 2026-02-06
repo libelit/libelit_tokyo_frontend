@@ -1,18 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, Clock, AlertCircle, ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Clock, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { DeveloperHeader } from "@/components/developer/developer-header";
 import { DocumentUploadCard, DocumentStatus } from "@/components/developer/document-upload-card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-
-type KybStatus = "not_started" | "pending" | "under_review" | "approved" | "rejected";
+import { developerProfileService, kybService } from "@/lib/api";
+import type { DeveloperProfile, Document, KybStatus, DocumentType } from "@/lib/types";
 
 interface KybDocument {
-  id: string;
-  type: string;
+  id: number | null;
+  type: DocumentType;
   title: string;
   description: string;
   required: boolean;
@@ -21,31 +21,30 @@ interface KybDocument {
   rejectionReason?: string;
 }
 
-// Mock data - will be replaced with API data
-const initialDocuments: KybDocument[] = [
+// Document type configurations
+const documentConfigs: Array<{
+  type: DocumentType;
+  title: string;
+  description: string;
+  required: boolean;
+}> = [
   {
-    id: "1",
-    type: "company_registration",
+    type: "kyb_certificate",
     title: "Company Registration Certificate",
     description: "Official certificate proving your business is legally registered",
     required: true,
-    status: "not_uploaded",
   },
   {
-    id: "2",
-    type: "director_id",
+    type: "kyb_id",
     title: "Director/Owner ID",
     description: "Government-issued identification of the company director or owner",
     required: true,
-    status: "not_uploaded",
   },
   {
-    id: "3",
-    type: "address_proof",
+    type: "kyb_address_proof",
     title: "Business Address Proof",
     description: "Utility bill or official letter showing your business address (within last 3 months)",
     required: true,
-    status: "not_uploaded",
   },
 ];
 
@@ -57,8 +56,88 @@ const statusSteps = [
 ];
 
 export default function KybVerificationPage() {
-  const [kybStatus, setKybStatus] = useState<KybStatus>("not_started");
-  const [documents, setDocuments] = useState<KybDocument[]>(initialDocuments);
+  const [profile, setProfile] = useState<DeveloperProfile | null>(null);
+  const [documents, setDocuments] = useState<KybDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingType, setUploadingType] = useState<DocumentType | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch profile and documents
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  async function fetchData() {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Fetch profile
+      const profileResponse = await developerProfileService.getProfile();
+      if (profileResponse.error) {
+        setError(profileResponse.error);
+        return;
+      }
+      if (profileResponse.data?.data) {
+        setProfile(profileResponse.data.data);
+      }
+
+      // Fetch KYB documents
+      const docsResponse = await kybService.getDocuments();
+      if (docsResponse.data?.data) {
+        const uploadedDocs = docsResponse.data.data;
+
+        // Map document configs with uploaded documents
+        const mappedDocs = documentConfigs.map((config) => {
+          const uploadedDoc = uploadedDocs.find(
+            (d: Document) => d.document_type === config.type
+          );
+
+          if (uploadedDoc) {
+            return {
+              id: uploadedDoc.id,
+              type: config.type,
+              title: config.title,
+              description: config.description,
+              required: config.required,
+              status: mapVerificationStatus(uploadedDoc.verification_status),
+              fileName: uploadedDoc.file_name,
+              rejectionReason: uploadedDoc.rejection_reason || undefined,
+            };
+          }
+
+          return {
+            id: null,
+            type: config.type,
+            title: config.title,
+            description: config.description,
+            required: config.required,
+            status: "not_uploaded" as DocumentStatus,
+          };
+        });
+
+        setDocuments(mappedDocs);
+      }
+    } catch (err) {
+      setError("Failed to load KYB data");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function mapVerificationStatus(status: string): DocumentStatus {
+    switch (status) {
+      case "approved":
+        return "verified";
+      case "rejected":
+        return "rejected";
+      default:
+        return "uploaded";
+    }
+  }
+
+  const kybStatus: KybStatus = profile?.kyb_status || "not_started";
 
   const uploadedCount = documents.filter(
     (d) => d.status === "uploaded" || d.status === "verified"
@@ -67,48 +146,134 @@ export default function KybVerificationPage() {
   const allRequiredUploaded = documents
     .filter((d) => d.required)
     .every((d) => d.status === "uploaded" || d.status === "verified");
-  const progressPercentage = (uploadedCount / documents.length) * 100;
+  const progressPercentage = documents.length > 0 ? (uploadedCount / documents.length) * 100 : 0;
 
-  const handleUpload = (docId: string, file: File) => {
-    // Simulate upload
+  const handleUpload = async (docType: DocumentType, file: File) => {
+    setUploadingType(docType);
+
+    // Update UI to show uploading state
     setDocuments((prev) =>
       prev.map((d) =>
-        d.id === docId ? { ...d, status: "uploading" as DocumentStatus } : d
+        d.type === docType ? { ...d, status: "uploading" as DocumentStatus } : d
       )
     );
 
-    // Simulate upload completion after 1 second
-    setTimeout(() => {
+    try {
+      const config = documentConfigs.find((c) => c.type === docType);
+      const response = await kybService.uploadDocument({
+        document_type: docType,
+        title: config?.title || docType,
+        file,
+      });
+
+      if (response.error) {
+        // Revert to not uploaded on error
+        setDocuments((prev) =>
+          prev.map((d) =>
+            d.type === docType ? { ...d, status: "not_uploaded" as DocumentStatus } : d
+          )
+        );
+        setError(response.error);
+        return;
+      }
+
+      if (response.data?.data) {
+        const uploadedDoc = response.data.data;
+        setDocuments((prev) =>
+          prev.map((d) =>
+            d.type === docType
+              ? {
+                  ...d,
+                  id: uploadedDoc.id,
+                  status: "uploaded" as DocumentStatus,
+                  fileName: uploadedDoc.file_name,
+                }
+              : d
+          )
+        );
+      }
+    } catch (err) {
       setDocuments((prev) =>
         prev.map((d) =>
-          d.id === docId
-            ? { ...d, status: "uploaded" as DocumentStatus, fileName: file.name }
+          d.type === docType ? { ...d, status: "not_uploaded" as DocumentStatus } : d
+        )
+      );
+      setError("Failed to upload document");
+    } finally {
+      setUploadingType(null);
+    }
+  };
+
+  const handleRemove = async (docType: DocumentType) => {
+    const doc = documents.find((d) => d.type === docType);
+    if (!doc?.id) return;
+
+    try {
+      const response = await kybService.deleteDocument(doc.id);
+
+      if (response.error) {
+        setError(response.error);
+        return;
+      }
+
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d.type === docType
+            ? { ...d, id: null, status: "not_uploaded" as DocumentStatus, fileName: undefined }
             : d
         )
       );
-    }, 1000);
+    } catch (err) {
+      setError("Failed to delete document");
+    }
   };
 
-  const handleRemove = (docId: string) => {
-    setDocuments((prev) =>
-      prev.map((d) =>
-        d.id === docId
-          ? { ...d, status: "not_uploaded" as DocumentStatus, fileName: undefined }
-          : d
-      )
-    );
-  };
+  const handleSubmit = async () => {
+    if (!allRequiredUploaded) return;
 
-  const handleSubmit = () => {
-    if (allRequiredUploaded) {
-      setKybStatus("pending");
-      // In real implementation, call API to submit KYB
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await kybService.submit();
+
+      if (response.error) {
+        setError(response.error);
+        return;
+      }
+
+      if (response.data?.success) {
+        // Refresh data to get updated status
+        await fetchData();
+      } else if (response.data?.missing_documents) {
+        setError(
+          `Missing documents: ${response.data.missing_documents
+            .map((d) => d.label)
+            .join(", ")}`
+        );
+      }
+    } catch (err) {
+      setError("Failed to submit KYB");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const getCurrentStepIndex = () => {
-    return statusSteps.findIndex((s) => s.key === kybStatus);
+    const index = statusSteps.findIndex((s) => s.key === kybStatus);
+    return index >= 0 ? index : 0;
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <DeveloperHeader title="KYB Verification" />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-[#E86A33]" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -122,6 +287,19 @@ export default function KybVerificationPage() {
         <ArrowLeft className="h-4 w-4 mr-1" />
         Back to Dashboard
       </Link>
+
+      {/* Error Message */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-red-600 text-sm">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-500 text-xs mt-1 underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Status Card */}
       <div className="rounded-xl border bg-white p-6 shadow-sm">
@@ -158,6 +336,15 @@ export default function KybVerificationPage() {
           )}
         </div>
 
+        {/* Rejection Reason */}
+        {kybStatus === "rejected" && profile?.kyb_rejection_reason && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-700">
+              <strong>Rejection Reason:</strong> {profile.kyb_rejection_reason}
+            </p>
+          </div>
+        )}
+
         {/* Progress Steps */}
         <div className="relative">
           <div className="flex justify-between mb-2">
@@ -165,7 +352,6 @@ export default function KybVerificationPage() {
               const currentIndex = getCurrentStepIndex();
               const isCompleted = index < currentIndex;
               const isCurrent = index === currentIndex;
-              const isPending = index > currentIndex;
 
               return (
                 <div
@@ -235,15 +421,15 @@ export default function KybVerificationPage() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {documents.map((doc) => (
               <DocumentUploadCard
-                key={doc.id}
+                key={doc.type}
                 title={doc.title}
                 description={doc.description}
                 required={doc.required}
-                status={doc.status}
+                status={uploadingType === doc.type ? "uploading" : doc.status}
                 fileName={doc.fileName}
                 rejectionReason={doc.rejectionReason}
-                onUpload={(file) => handleUpload(doc.id, file)}
-                onRemove={() => handleRemove(doc.id)}
+                onUpload={(file) => handleUpload(doc.type, file)}
+                onRemove={() => handleRemove(doc.type)}
               />
             ))}
           </div>
@@ -252,10 +438,17 @@ export default function KybVerificationPage() {
           <div className="flex justify-end">
             <Button
               onClick={handleSubmit}
-              disabled={!allRequiredUploaded}
+              disabled={!allRequiredUploaded || isSubmitting}
               className="bg-[#E86A33] hover:bg-[#d55a25] disabled:bg-gray-300"
             >
-              Submit for Verification
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit for Verification"
+              )}
             </Button>
           </div>
         </>
@@ -304,18 +497,36 @@ export default function KybVerificationPage() {
           <div className="space-y-3">
             {documents.map((doc) => (
               <div
-                key={doc.id}
+                key={doc.type}
                 className="flex items-center justify-between p-4 rounded-lg border"
               >
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  {doc.status === "verified" ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  ) : doc.status === "rejected" ? (
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                  ) : (
+                    <Clock className="h-5 w-5 text-yellow-500" />
+                  )}
                   <div>
                     <p className="font-medium">{doc.title}</p>
                     <p className="text-sm text-gray-500">{doc.fileName}</p>
                   </div>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
-                  Uploaded
+                <span
+                  className={`text-xs px-2 py-1 rounded-full ${
+                    doc.status === "verified"
+                      ? "bg-green-100 text-green-700"
+                      : doc.status === "rejected"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}
+                >
+                  {doc.status === "verified"
+                    ? "Verified"
+                    : doc.status === "rejected"
+                    ? "Rejected"
+                    : "Pending"}
                 </span>
               </div>
             ))}

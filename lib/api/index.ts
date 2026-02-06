@@ -9,3 +9,10 @@ export type {
   RegisterRequest,
   RegisterResponse,
 } from "./auth";
+
+export {
+  developerProfileService,
+  kybService,
+  projectsService,
+  projectDocumentsService,
+} from "./developer";

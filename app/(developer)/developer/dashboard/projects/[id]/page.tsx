@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,146 +16,229 @@ import {
   CheckCircle2,
   AlertCircle,
   Upload,
+  Loader2,
 } from "lucide-react";
 import { DeveloperHeader } from "@/components/developer/developer-header";
-import { ProjectStatusBadge, ProjectStatus } from "@/components/developer/project-status-badge";
+import { ProjectStatusBadge } from "@/components/developer/project-status-badge";
 import { DocumentUploadCard, DocumentStatus } from "@/components/developer/document-upload-card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { projectsService, projectDocumentsService } from "@/lib/api/developer";
+import {
+  Project,
+  Document,
+  DocumentType,
+  DocumentChecklistItem,
+} from "@/lib/types/developer";
+import { toast } from "sonner";
 
-interface LoanDocument {
-  id: string;
-  type: string;
-  title: string;
-  description: string;
-  required: boolean;
-  status: DocumentStatus;
-  fileName?: string;
-  rejectionReason?: string;
-}
-
-// Mock project data - will be replaced with API data
-const mockProject = {
-  id: "1",
-  title: "Sunset Heights Residential Complex",
-  type: "Residential",
-  description: "A modern residential complex featuring 48 luxury apartments with stunning sunset views. The development includes premium amenities such as a rooftop garden, fitness center, and underground parking.",
-  address: "123 Sunset Boulevard",
-  city: "Sydney",
-  country: "Australia",
-  fundingGoal: 2500000,
-  minInvestment: 1000,
-  expectedReturn: 12,
-  loanTermMonths: 24,
-  ltvRatio: 70,
-  status: "draft" as ProjectStatus,
-  createdAt: "2026-02-01",
-};
-
-// Loan Application Documents required for Stage 1
-const initialLoanDocuments: LoanDocument[] = [
-  {
-    id: "1",
-    type: "drawings",
+// Map document type to display info
+const documentTypeInfo: Record<string, { title: string; description: string }> = {
+  loan_drawings: {
     title: "Architectural Drawings",
     description: "Complete architectural and engineering plans for the project",
-    required: true,
-    status: "not_uploaded",
   },
-  {
-    id: "2",
-    type: "cost_calculation",
+  loan_cost_calculation: {
     title: "Cost Calculation",
     description: "Detailed budget breakdown and cost estimates",
-    required: true,
-    status: "not_uploaded",
   },
-  {
-    id: "3",
-    type: "site_photos",
+  loan_photos: {
     title: "Site Photos",
     description: "Current photos of the property/site",
-    required: true,
-    status: "not_uploaded",
   },
-  {
-    id: "4",
-    type: "land_title",
+  loan_land_title: {
     title: "Land Title",
     description: "Proof of land ownership or control",
-    required: true,
-    status: "not_uploaded",
   },
-  {
-    id: "5",
-    type: "bank_statement",
+  loan_bank_statement: {
     title: "Bank Statement",
     description: "Recent bank statements showing available funds",
-    required: true,
-    status: "not_uploaded",
   },
-  {
-    id: "6",
-    type: "revenue_evidence",
+  loan_revenue_evidence: {
     title: "Revenue Evidence",
     description: "Evidence of business revenue and track record",
-    required: false,
-    status: "not_uploaded",
   },
-];
+};
+
+// Map verification status to document status
+const mapVerificationToDocStatus = (
+  verificationStatus: string | undefined
+): DocumentStatus => {
+  if (!verificationStatus) return "not_uploaded";
+  switch (verificationStatus) {
+    case "approved":
+      return "verified";
+    case "rejected":
+      return "rejected";
+    case "pending":
+    default:
+      return "uploaded";
+  }
+};
 
 export default function ProjectDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const projectId = Number(params.id);
+
   const [activeTab, setActiveTab] = useState<"overview" | "documents">("overview");
-  const [documents, setDocuments] = useState<LoanDocument[]>(initialLoanDocuments);
+  const [project, setProject] = useState<Project | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
+  const [allRequiredUploaded, setAllRequiredUploaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const project = mockProject;
-  const canEdit = project.status === "draft" || project.status === "rejected";
-  const canSubmit = project.status === "draft";
+  const fetchProject = useCallback(async () => {
+    try {
+      const response = await projectsService.get(projectId);
+      if (response.data?.success) {
+        setProject(response.data.data);
+      } else {
+        toast.error("Failed to load project");
+        router.push("/developer/dashboard/projects");
+      }
+    } catch (error) {
+      console.error("Error fetching project:", error);
+      toast.error("Failed to load project");
+      router.push("/developer/dashboard/projects");
+    }
+  }, [projectId, router]);
 
-  const uploadedCount = documents.filter(
-    (d) => d.status === "uploaded" || d.status === "verified"
-  ).length;
-  const requiredCount = documents.filter((d) => d.required).length;
-  const allRequiredUploaded = documents
-    .filter((d) => d.required)
-    .every((d) => d.status === "uploaded" || d.status === "verified");
-  const progressPercentage = (uploadedCount / documents.length) * 100;
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const response = await projectDocumentsService.list(projectId);
+      if (response.data?.success) {
+        setDocuments(response.data.data.documents);
+        setChecklist(response.data.data.document_checklist);
+        setAllRequiredUploaded(response.data.data.all_required_uploaded);
+      }
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+    }
+  }, [projectId]);
 
-  const handleUpload = (docId: string, file: File) => {
-    setDocuments((prev) =>
-      prev.map((d) =>
-        d.id === docId ? { ...d, status: "uploading" as DocumentStatus } : d
-      )
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      await Promise.all([fetchProject(), fetchDocuments()]);
+      setIsLoading(false);
+    };
+    loadData();
+  }, [fetchProject, fetchDocuments]);
+
+  const canEdit = project?.status === "draft" || project?.status === "rejected";
+  const canSubmit = project?.status === "draft";
+
+  // Get document for a checklist item
+  const getDocumentForType = (type: DocumentType): Document | undefined => {
+    return documents.find((d) => d.document_type === type);
+  };
+
+  // Calculate progress
+  const uploadedCount = checklist.filter((item) => item.uploaded).length;
+  const progressPercentage = checklist.length > 0
+    ? (uploadedCount / checklist.length) * 100
+    : 0;
+  const requiredRemaining = checklist.filter((item) => item.required && !item.uploaded).length;
+
+  const handleUpload = async (docType: DocumentType, file: File) => {
+    setUploadingDocType(docType);
+    try {
+      const response = await projectDocumentsService.upload(projectId, {
+        document_type: docType,
+        title: documentTypeInfo[docType]?.title || docType,
+        file,
+      });
+      if (response.data?.success) {
+        toast.success("Document uploaded successfully");
+        await fetchDocuments();
+      } else {
+        toast.error(response.data?.message || "Failed to upload document");
+      }
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      toast.error("Failed to upload document");
+    } finally {
+      setUploadingDocType(null);
+    }
+  };
+
+  const handleRemove = async (docId: number) => {
+    if (!confirm("Are you sure you want to remove this document?")) return;
+
+    setDeletingDocId(docId);
+    try {
+      const response = await projectDocumentsService.delete(projectId, docId);
+      if (response.data?.success) {
+        toast.success("Document removed");
+        await fetchDocuments();
+      } else {
+        toast.error(response.data?.message || "Failed to remove document");
+      }
+    } catch (error) {
+      console.error("Error removing document:", error);
+      toast.error("Failed to remove document");
+    } finally {
+      setDeletingDocId(null);
+    }
+  };
+
+  const handleSubmitForReview = async () => {
+    if (!allRequiredUploaded) {
+      toast.error("Please upload all required documents first");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await projectsService.submit(projectId);
+      if (response.data?.success) {
+        toast.success("Project submitted for review");
+        await fetchProject();
+      } else {
+        if (response.data?.missing_documents) {
+          const missing = response.data.missing_documents.map((d) => d.label).join(", ");
+          toast.error(`Missing documents: ${missing}`);
+        } else {
+          toast.error(response.data?.message || "Failed to submit project");
+        }
+      }
+    } catch (error) {
+      console.error("Error submitting project:", error);
+      toast.error("Failed to submit project");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <DeveloperHeader title="Project Details" />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-[#E86A33]" />
+        </div>
+      </div>
     );
+  }
 
-    setTimeout(() => {
-      setDocuments((prev) =>
-        prev.map((d) =>
-          d.id === docId
-            ? { ...d, status: "uploaded" as DocumentStatus, fileName: file.name }
-            : d
-        )
-      );
-    }, 1000);
-  };
-
-  const handleRemove = (docId: string) => {
-    setDocuments((prev) =>
-      prev.map((d) =>
-        d.id === docId
-          ? { ...d, status: "not_uploaded" as DocumentStatus, fileName: undefined }
-          : d
-      )
+  if (!project) {
+    return (
+      <div className="space-y-6">
+        <DeveloperHeader title="Project Details" />
+        <div className="rounded-xl border bg-white p-12 text-center">
+          <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold mb-2">Project not found</h2>
+          <Link href="/developer/dashboard/projects">
+            <Button variant="outline">Back to Projects</Button>
+          </Link>
+        </div>
+      </div>
     );
-  };
-
-  const handleSubmitForReview = () => {
-    // In real implementation, call API to submit project
-    console.log("Submitting project for review");
-    router.push("/developer/dashboard/projects");
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -176,12 +259,18 @@ export default function ProjectDetailsPage() {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <ProjectStatusBadge status={project.status} />
-              <span className="text-sm text-gray-500">{project.type}</span>
+              <span className="text-sm text-gray-500 capitalize">
+                {project.project_type.replace("_", " ")}
+              </span>
             </div>
             <h1 className="text-2xl font-bold mb-2">{project.title}</h1>
             <div className="flex items-center gap-1 text-gray-500">
               <MapPin className="h-4 w-4" />
-              <span>{project.address}, {project.city}, {project.country}</span>
+              <span>
+                {[project.address, project.city, project.country]
+                  .filter(Boolean)
+                  .join(", ") || "Location not set"}
+              </span>
             </div>
           </div>
           <div className="flex gap-3">
@@ -196,6 +285,19 @@ export default function ProjectDetailsPage() {
           </div>
         </div>
       </div>
+
+      {/* Rejection Reason */}
+      {project.status === "rejected" && project.rejection_reason && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+            <div>
+              <h3 className="font-medium text-red-800">Project Rejected</h3>
+              <p className="text-sm text-red-700 mt-1">{project.rejection_reason}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b">
@@ -219,9 +321,9 @@ export default function ProjectDetailsPage() {
             }`}
           >
             Loan Documents
-            {!allRequiredUploaded && (
+            {requiredRemaining > 0 && (
               <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">
-                {requiredCount - documents.filter(d => d.required && (d.status === "uploaded" || d.status === "verified")).length} required
+                {requiredRemaining} required
               </span>
             )}
           </button>
@@ -236,7 +338,9 @@ export default function ProjectDetailsPage() {
             {/* Description */}
             <div className="rounded-xl border bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold mb-4">About This Project</h2>
-              <p className="text-gray-600 whitespace-pre-wrap">{project.description}</p>
+              <p className="text-gray-600 whitespace-pre-wrap">
+                {project.description || "No description provided."}
+              </p>
             </div>
 
             {/* Location Details */}
@@ -248,15 +352,15 @@ export default function ProjectDetailsPage() {
               <dl className="grid grid-cols-2 gap-4">
                 <div>
                   <dt className="text-sm text-gray-500">Address</dt>
-                  <dd className="font-medium">{project.address}</dd>
+                  <dd className="font-medium">{project.address || "-"}</dd>
                 </div>
                 <div>
                   <dt className="text-sm text-gray-500">City</dt>
-                  <dd className="font-medium">{project.city}</dd>
+                  <dd className="font-medium">{project.city || "-"}</dd>
                 </div>
                 <div>
                   <dt className="text-sm text-gray-500">Country</dt>
-                  <dd className="font-medium">{project.country}</dd>
+                  <dd className="font-medium">{project.country || "-"}</dd>
                 </div>
               </dl>
             </div>
@@ -273,30 +377,32 @@ export default function ProjectDetailsPage() {
               <dl className="space-y-4">
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Funding Goal</dt>
-                  <dd className="font-semibold">${project.fundingGoal.toLocaleString()}</dd>
+                  <dd className="font-semibold">${project.funding_goal.toLocaleString()}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Min Investment</dt>
-                  <dd className="font-medium">${project.minInvestment.toLocaleString()}</dd>
+                  <dd className="font-medium">${project.min_investment.toLocaleString()}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500 flex items-center gap-1">
                     <Percent className="h-3 w-3" />
                     Expected Return
                   </dt>
-                  <dd className="font-medium text-green-600">{project.expectedReturn}%</dd>
+                  <dd className="font-medium text-green-600">{project.expected_return}%</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     Loan Term
                   </dt>
-                  <dd className="font-medium">{project.loanTermMonths} months</dd>
+                  <dd className="font-medium">{project.loan_term_months} months</dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">LTV Ratio</dt>
-                  <dd className="font-medium">{project.ltvRatio}%</dd>
-                </div>
+                {project.ltv_ratio && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">LTV Ratio</dt>
+                    <dd className="font-medium">{project.ltv_ratio}%</dd>
+                  </div>
+                )}
               </dl>
             </div>
 
@@ -310,9 +416,25 @@ export default function ProjectDetailsPage() {
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Created</dt>
                   <dd className="font-medium">
-                    {new Date(project.createdAt).toLocaleDateString()}
+                    {new Date(project.created_at).toLocaleDateString()}
                   </dd>
                 </div>
+                {project.submitted_at && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">Submitted</dt>
+                    <dd className="font-medium">
+                      {new Date(project.submitted_at).toLocaleDateString()}
+                    </dd>
+                  </div>
+                )}
+                {project.approved_at && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">Approved</dt>
+                    <dd className="font-medium">
+                      {new Date(project.approved_at).toLocaleDateString()}
+                    </dd>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Status</dt>
                   <dd>
@@ -359,7 +481,7 @@ export default function ProjectDetailsPage() {
                 </p>
               </div>
               <span className="text-sm text-gray-500">
-                {uploadedCount} of {documents.length} uploaded
+                {uploadedCount} of {checklist.length} uploaded
               </span>
             </div>
             <Progress value={progressPercentage} className="h-2" />
@@ -373,27 +495,47 @@ export default function ProjectDetailsPage() {
               </div>
             ) : (
               <p className="text-sm text-gray-500 mt-4">
-                {requiredCount - documents.filter(d => d.required && (d.status === "uploaded" || d.status === "verified")).length} required documents remaining
+                {requiredRemaining} required documents remaining
               </p>
             )}
           </div>
 
           {/* Document Upload Cards */}
           <div className="grid gap-6 md:grid-cols-2">
-            {documents.map((doc) => (
-              <DocumentUploadCard
-                key={doc.id}
-                title={doc.title}
-                description={doc.description}
-                required={doc.required}
-                status={doc.status}
-                fileName={doc.fileName}
-                rejectionReason={doc.rejectionReason}
-                acceptedFormats={doc.type === "site_photos" ? "JPG, PNG" : "PDF, JPG, PNG"}
-                onUpload={(file) => handleUpload(doc.id, file)}
-                onRemove={() => handleRemove(doc.id)}
-              />
-            ))}
+            {checklist.map((item) => {
+              const doc = getDocumentForType(item.type);
+              const info = documentTypeInfo[item.type] || { title: item.label, description: "" };
+              const isUploading = uploadingDocType === item.type;
+              const isDeleting = doc && deletingDocId === doc.id;
+
+              let status: DocumentStatus = "not_uploaded";
+              if (isUploading) {
+                status = "uploading";
+              } else if (doc) {
+                status = mapVerificationToDocStatus(doc.verification_status);
+              }
+
+              return (
+                <div key={item.type} className="relative">
+                  {isDeleting && (
+                    <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10 rounded-xl">
+                      <Loader2 className="h-6 w-6 animate-spin text-[#E86A33]" />
+                    </div>
+                  )}
+                  <DocumentUploadCard
+                    title={info.title}
+                    description={info.description}
+                    required={item.required}
+                    status={status}
+                    fileName={doc?.file_name}
+                    rejectionReason={doc?.rejection_reason || undefined}
+                    acceptedFormats={item.type === "loan_photos" ? "JPG, PNG" : "PDF, JPG, PNG"}
+                    onUpload={(file) => handleUpload(item.type, file)}
+                    onRemove={() => doc && handleRemove(doc.id)}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           {/* Submit Button */}
@@ -401,11 +543,20 @@ export default function ProjectDetailsPage() {
             <div className="flex justify-end pt-4 border-t">
               <Button
                 onClick={handleSubmitForReview}
-                disabled={!allRequiredUploaded}
+                disabled={!allRequiredUploaded || isSubmitting}
                 className="bg-[#E86A33] hover:bg-[#d55a25] disabled:bg-gray-300"
               >
-                <FileText className="mr-2 h-4 w-4" />
-                Submit Project for Review
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Submit Project for Review
+                  </>
+                )}
               </Button>
             </div>
           )}

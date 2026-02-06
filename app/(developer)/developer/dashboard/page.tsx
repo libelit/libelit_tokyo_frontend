@@ -1,36 +1,105 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, DollarSign, Clock, Plus, ArrowRight } from "lucide-react";
+import { Building2, DollarSign, Clock, Plus, ArrowRight, Loader2 } from "lucide-react";
 import { DeveloperHeader } from "@/components/developer/developer-header";
-import { KybStatusBanner, KybStatus } from "@/components/developer/kyb-status-banner";
+import { KybStatusBanner } from "@/components/developer/kyb-status-banner";
 import { Button } from "@/components/ui/button";
-
-// Mock data - will be replaced with API data
-const mockKybStatus: KybStatus = "not_started";
-const mockStats = {
-  activeProjects: 0,
-  totalFunding: 0,
-  pendingRequests: 0,
-};
-const mockRecentProjects: Array<{
-  id: string;
-  title: string;
-  status: string;
-  fundingGoal: number;
-  createdAt: string;
-}> = [];
+import { developerProfileService, projectsService } from "@/lib/api";
+import type { DeveloperProfile, Project, KybStatus } from "@/lib/types";
 
 export default function DeveloperDashboardPage() {
-  const kybStatus = mockKybStatus;
+  const [profile, setProfile] = useState<DeveloperProfile | null>(null);
+  const [recentProjects, setRecentProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Fetch profile
+        const profileResponse = await developerProfileService.getProfile();
+        if (profileResponse.error) {
+          setError(profileResponse.error);
+          return;
+        }
+        if (profileResponse.data?.data) {
+          setProfile(profileResponse.data.data);
+        }
+
+        // Fetch recent projects if KYB is approved
+        if (profileResponse.data?.data?.kyb_status === "approved") {
+          const projectsResponse = await projectsService.list({ per_page: 5 });
+          if (projectsResponse.data?.data) {
+            setRecentProjects(projectsResponse.data.data);
+          }
+        }
+      } catch (err) {
+        setError("Failed to load dashboard data");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <DeveloperHeader title="Developer Dashboard" />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-[#E86A33]" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <DeveloperHeader title="Developer Dashboard" />
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+          <p className="text-red-600">{error}</p>
+          <Button
+            onClick={() => window.location.reload()}
+            variant="outline"
+            className="mt-4"
+          >
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const kybStatus: KybStatus = profile?.kyb_status || "not_started";
   const isKybApproved = kybStatus === "approved";
+
+  // Calculate stats from projects
+  const stats = {
+    activeProjects: recentProjects.filter(
+      (p) => !["draft", "rejected", "completed"].includes(p.status)
+    ).length,
+    totalFunding: recentProjects.reduce((sum, p) => sum + (p.amount_raised || 0), 0),
+    pendingRequests: recentProjects.filter(
+      (p) => p.status === "submitted" || p.status === "under_review"
+    ).length,
+  };
 
   return (
     <div className="space-y-6">
       <DeveloperHeader title="Developer Dashboard" />
 
       {/* KYB Status Banner */}
-      <KybStatusBanner status={kybStatus} />
+      <KybStatusBanner
+        status={kybStatus}
+        rejectionReason={profile?.kyb_rejection_reason || undefined}
+      />
 
       {/* Stats Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -41,7 +110,7 @@ export default function DeveloperDashboardPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Active Projects</p>
-              <p className="text-2xl font-bold">{mockStats.activeProjects}</p>
+              <p className="text-2xl font-bold">{stats.activeProjects}</p>
             </div>
           </div>
         </div>
@@ -52,7 +121,7 @@ export default function DeveloperDashboardPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Total Funding</p>
-              <p className="text-2xl font-bold">${mockStats.totalFunding.toLocaleString()}</p>
+              <p className="text-2xl font-bold">${stats.totalFunding.toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -63,7 +132,7 @@ export default function DeveloperDashboardPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Pending Requests</p>
-              <p className="text-2xl font-bold text-[#E86A33]">{mockStats.pendingRequests}</p>
+              <p className="text-2xl font-bold text-[#E86A33]">{stats.pendingRequests}</p>
             </div>
           </div>
         </div>
@@ -94,29 +163,30 @@ export default function DeveloperDashboardPage() {
       <div className="rounded-xl border bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Recent Projects</h2>
-          {mockRecentProjects.length > 0 && (
+          {recentProjects.length > 0 && (
             <Link href="/developer/dashboard/projects" className="text-sm text-[#E86A33] hover:underline">
               View all
             </Link>
           )}
         </div>
-        {mockRecentProjects.length > 0 ? (
+        {recentProjects.length > 0 ? (
           <div className="space-y-4">
-            {mockRecentProjects.map((project) => (
-              <div
+            {recentProjects.map((project) => (
+              <Link
                 key={project.id}
+                href={`/developer/dashboard/projects/${project.id}`}
                 className="flex items-center justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors"
               >
                 <div>
                   <h3 className="font-medium">{project.title}</h3>
                   <p className="text-sm text-gray-500">
-                    ${project.fundingGoal.toLocaleString()} goal
+                    ${project.funding_goal.toLocaleString()} goal
                   </p>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
-                  {project.status}
+                <span className={`text-xs px-2 py-1 rounded-full ${getStatusStyle(project.status)}`}>
+                  {formatStatus(project.status)}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         ) : (
@@ -147,4 +217,24 @@ export default function DeveloperDashboardPage() {
       </div>
     </div>
   );
+}
+
+function getStatusStyle(status: string): string {
+  const styles: Record<string, string> = {
+    draft: "bg-gray-100 text-gray-600",
+    submitted: "bg-blue-100 text-blue-600",
+    under_review: "bg-yellow-100 text-yellow-700",
+    approved: "bg-green-100 text-green-600",
+    rejected: "bg-red-100 text-red-600",
+    funded: "bg-purple-100 text-purple-600",
+    completed: "bg-emerald-100 text-emerald-600",
+  };
+  return styles[status] || "bg-gray-100 text-gray-600";
+}
+
+function formatStatus(status: string): string {
+  return status
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }

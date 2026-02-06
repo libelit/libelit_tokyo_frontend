@@ -1,20 +1,10 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { ProjectStatus } from "@/lib/types/developer";
 
-export type ProjectStatus =
-  | "draft"
-  | "submitted"
-  | "under_review"
-  | "approved"
-  | "rejected"
-  | "tokenizing"
-  | "listed"
-  | "funding"
-  | "funded"
-  | "in_progress"
-  | "completed"
-  | "defaulted";
+// Re-export for backwards compatibility
+export type { ProjectStatus };
 
 interface ProjectStatusBadgeProps {
   status: ProjectStatus;
@@ -42,33 +32,13 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
     label: "Rejected",
     className: "bg-red-100 text-red-700",
   },
-  tokenizing: {
-    label: "Tokenizing",
-    className: "bg-purple-100 text-purple-700",
-  },
-  listed: {
-    label: "Listed",
-    className: "bg-indigo-100 text-indigo-700",
-  },
-  funding: {
-    label: "Funding",
-    className: "bg-orange-100 text-orange-700",
-  },
   funded: {
     label: "Funded",
-    className: "bg-green-100 text-green-700",
-  },
-  in_progress: {
-    label: "In Progress",
-    className: "bg-blue-100 text-blue-700",
+    className: "bg-purple-100 text-purple-700",
   },
   completed: {
     label: "Completed",
     className: "bg-teal-100 text-teal-700",
-  },
-  defaulted: {
-    label: "Defaulted",
-    className: "bg-red-100 text-red-700",
   },
 };
 

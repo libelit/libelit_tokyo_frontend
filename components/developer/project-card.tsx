@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 
 interface ProjectCardProps {
-  id: string;
+  id: number;
   title: string;
   type: string;
   location: string;
@@ -15,7 +15,7 @@ interface ProjectCardProps {
   status: ProjectStatus;
   createdAt: string;
   imageUrl?: string;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: number) => void;
 }
 
 export function ProjectCard({

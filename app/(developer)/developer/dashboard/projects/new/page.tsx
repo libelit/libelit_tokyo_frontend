@@ -11,6 +11,7 @@ import {
   MapPin,
   DollarSign,
   FileCheck,
+  Loader2,
 } from "lucide-react";
 import { DeveloperHeader } from "@/components/developer/developer-header";
 import { Button } from "@/components/ui/button";
@@ -18,8 +19,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { projectsService } from "@/lib/api/developer";
+import { ProjectType, CreateProjectRequest } from "@/lib/types/developer";
+import { toast } from "sonner";
 
-const projectTypes = [
+const projectTypes: { value: ProjectType; label: string }[] = [
   { value: "residential", label: "Residential" },
   { value: "commercial", label: "Commercial" },
   { value: "mixed_use", label: "Mixed-Use" },
@@ -37,7 +41,7 @@ const steps = [
 interface ProjectFormData {
   // Step 1: Basic Info
   title: string;
-  projectType: string;
+  projectType: ProjectType | "";
   description: string;
   // Step 2: Location
   address: string;
@@ -70,6 +74,7 @@ export default function CreateProjectPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<ProjectFormData>(initialFormData);
   const [errors, setErrors] = useState<Partial<ProjectFormData>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateFormData = (field: keyof ProjectFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -112,16 +117,57 @@ export default function CreateProjectPage() {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const handleSaveDraft = () => {
-    // In real implementation, call API to save draft
-    console.log("Saving draft:", formData);
-    router.push("/developer/dashboard/projects");
+  const buildProjectRequest = (): CreateProjectRequest => {
+    return {
+      title: formData.title,
+      description: formData.description,
+      project_type: formData.projectType as ProjectType,
+      address: formData.address,
+      city: formData.city,
+      country: formData.country,
+      funding_goal: parseFloat(formData.fundingGoal),
+      min_investment: parseFloat(formData.minInvestment),
+      expected_return: parseFloat(formData.expectedReturn),
+      loan_term_months: parseInt(formData.loanTermMonths),
+      ltv_ratio: parseFloat(formData.ltvRatio),
+    };
   };
 
-  const handleSubmit = () => {
-    // In real implementation, call API to create project
-    console.log("Creating project:", formData);
-    router.push("/developer/dashboard/projects");
+  const handleSaveDraft = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await projectsService.create(buildProjectRequest());
+      if (response.data?.success) {
+        toast.success("Project saved as draft");
+        router.push("/developer/dashboard/projects");
+      } else {
+        toast.error(response.data?.message || "Failed to save project");
+      }
+    } catch (error) {
+      console.error("Error saving project:", error);
+      toast.error("Failed to save project");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await projectsService.create(buildProjectRequest());
+      if (response.data?.success) {
+        toast.success("Project created successfully");
+        // Navigate to project details page to upload documents
+        router.push(`/developer/dashboard/projects/${response.data.data.id}`);
+      } else {
+        toast.error(response.data?.message || "Failed to create project");
+      }
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast.error("Failed to create project");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -557,7 +603,7 @@ export default function CreateProjectPage() {
       <div className="flex justify-between">
         <div>
           {currentStep > 1 && (
-            <Button variant="outline" onClick={handlePrevious}>
+            <Button variant="outline" onClick={handlePrevious} disabled={isSubmitting}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Previous
             </Button>
@@ -566,14 +612,29 @@ export default function CreateProjectPage() {
         <div className="flex gap-4">
           {currentStep === steps.length ? (
             <>
-              <Button variant="outline" onClick={handleSaveDraft}>
-                Save as Draft
+              <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save as Draft"
+                )}
               </Button>
               <Button
                 className="bg-[#E86A33] hover:bg-[#d55a25]"
                 onClick={handleSubmit}
+                disabled={isSubmitting}
               >
-                Save & Continue to Documents
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Save & Continue to Documents"
+                )}
               </Button>
             </>
           ) : (
