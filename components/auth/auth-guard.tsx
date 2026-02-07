@@ -12,7 +12,7 @@ interface AuthGuardProps {
 const publicRoutes = ["/login", "/register", "/forgot-password"];
 
 // Routes for specific user types
-const investorRoutes = ["/dashboard"];
+const lenderRoutes = ["/dashboard"];
 const developerRoutes = ["/developer"];
 
 function getDashboardPath(userType: string): string {
@@ -23,7 +23,7 @@ function isCorrectDashboard(pathname: string, userType: string): boolean {
   if (userType === "developer") {
     return pathname.startsWith("/developer");
   }
-  // Investor should not access developer routes
+  // Lender should not access developer routes
   return !pathname.startsWith("/developer");
 }
 

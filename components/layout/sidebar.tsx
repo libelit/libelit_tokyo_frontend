@@ -64,7 +64,7 @@ function UserProfile() {
         <span className="text-sm font-medium text-gray-900">
           {user?.name || "User"}
         </span>
-        <span className="text-xs capitalize">{user?.type || "Investor"}</span>
+        <span className="text-xs capitalize">{user?.type || "Lender"}</span>
       </div>
       <button
         onClick={handleLogout}

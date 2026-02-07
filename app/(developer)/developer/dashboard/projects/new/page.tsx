@@ -469,7 +469,7 @@ export default function CreateProjectPage() {
               <div className="p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-700">
                   <strong>LTV Ratio (Loan-to-Value):</strong> The loan amount as a percentage of the property&apos;s value.
-                  Lower LTV means lower risk for investors. Industry standard is typically 65-80%.
+                  Lower LTV means lower risk for lenders. Industry standard is typically 65-80%.
                 </p>
               </div>
             </div>

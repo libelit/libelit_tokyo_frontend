@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, Clock, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
-import { InvestorDocumentUploadCard, InvestorDocumentStatus } from "@/components/dashboard/investor-document-upload-card";
+import { LenderDocumentUploadCard, LenderDocumentStatus } from "@/components/dashboard/lender-document-upload-card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
@@ -13,20 +13,20 @@ import { Progress } from "@/components/ui/progress";
 const HARDCODED_KYB_STATUS = "not_started";
 const HARDCODED_REJECTION_REASON = "Documents were unclear. Please resubmit with better quality images.";
 
-type InvestorKybStatus = "not_started" | "pending" | "under_review" | "approved" | "rejected";
+type LenderKybStatus = "not_started" | "pending" | "under_review" | "approved" | "rejected";
 
-interface InvestorKybDocument {
+interface LenderKybDocument {
   id: string;
   type: string;
   title: string;
   description: string;
   required: boolean;
-  status: InvestorDocumentStatus;
+  status: LenderDocumentStatus;
   fileName?: string;
   rejectionReason?: string;
 }
 
-// Document configurations for investors
+// Document configurations for lenders
 const documentConfigs = [
   {
     type: "government_id",
@@ -55,19 +55,19 @@ const statusSteps = [
   { key: "approved", label: "Approved" },
 ];
 
-export default function InvestorKybVerificationPage() {
+export default function LenderKybVerificationPage() {
   // Hardcoded status - in real implementation this would come from API
-  const [kybStatus] = useState<InvestorKybStatus>(HARDCODED_KYB_STATUS);
+  const [kybStatus] = useState<LenderKybStatus>(HARDCODED_KYB_STATUS);
 
   // Initialize documents with hardcoded initial state
-  const [documents, setDocuments] = useState<InvestorKybDocument[]>(
+  const [documents, setDocuments] = useState<LenderKybDocument[]>(
     documentConfigs.map((config) => ({
       id: config.type,
       type: config.type,
       title: config.title,
       description: config.description,
       required: config.required,
-      status: "not_uploaded" as InvestorDocumentStatus,
+      status: "not_uploaded" as LenderDocumentStatus,
     }))
   );
 
@@ -88,7 +88,7 @@ export default function InvestorKybVerificationPage() {
     setDocuments((prev) =>
       prev.map((d) =>
         d.type === docType
-          ? { ...d, status: "uploading" as InvestorDocumentStatus }
+          ? { ...d, status: "uploading" as LenderDocumentStatus }
           : d
       )
     );
@@ -100,7 +100,7 @@ export default function InvestorKybVerificationPage() {
           d.type === docType
             ? {
                 ...d,
-                status: "uploaded" as InvestorDocumentStatus,
+                status: "uploaded" as LenderDocumentStatus,
                 fileName: file.name,
               }
             : d
@@ -113,7 +113,7 @@ export default function InvestorKybVerificationPage() {
     setDocuments((prev) =>
       prev.map((d) =>
         d.type === docType
-          ? { ...d, status: "not_uploaded" as InvestorDocumentStatus, fileName: undefined }
+          ? { ...d, status: "not_uploaded" as LenderDocumentStatus, fileName: undefined }
           : d
       )
     );
@@ -283,7 +283,7 @@ export default function InvestorKybVerificationPage() {
           {/* Document Cards */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {documents.map((doc) => (
-              <InvestorDocumentUploadCard
+              <LenderDocumentUploadCard
                 key={doc.type}
                 title={doc.title}
                 description={doc.description}

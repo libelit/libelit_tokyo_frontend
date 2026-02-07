@@ -1285,7 +1285,7 @@ export default function ProjectDetailsPage() {
               <li>Your project and documents will be reviewed by our team</li>
               <li>Review typically takes 2-3 business days</li>
               <li>You&apos;ll be notified once the review is complete</li>
-              <li>If approved, your project will be listed for investor funding</li>
+              <li>If approved, your project will be listed for lender funding</li>
             </ol>
           </div>
         </div>

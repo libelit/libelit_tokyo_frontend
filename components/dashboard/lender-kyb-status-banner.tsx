@@ -4,10 +4,10 @@ import Link from "next/link";
 import { AlertCircle, CheckCircle2, Clock, XCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export type InvestorKybStatus = "not_started" | "pending" | "under_review" | "approved" | "rejected";
+export type LenderKybStatus = "not_started" | "pending" | "under_review" | "approved" | "rejected";
 
-interface InvestorKybStatusBannerProps {
-  status: InvestorKybStatus;
+interface LenderKybStatusBannerProps {
+  status: LenderKybStatus;
   rejectionReason?: string;
 }
 
@@ -64,7 +64,7 @@ const statusConfig = {
   },
 };
 
-export function InvestorKybStatusBanner({ status, rejectionReason }: InvestorKybStatusBannerProps) {
+export function LenderKybStatusBanner({ status, rejectionReason }: LenderKybStatusBannerProps) {
   const config = statusConfig[status];
   const Icon = config.icon;
 

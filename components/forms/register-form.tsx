@@ -21,7 +21,7 @@ import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
 import { authService } from "@/lib/api";
 
 const accountTypes = [
-  { value: "investor", label: "Investor" },
+  { value: "lender", label: "Lender" },
   { value: "developer", label: "Developer" },
 ];
 

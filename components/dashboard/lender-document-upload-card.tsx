@@ -5,13 +5,13 @@ import { Upload, File, X, CheckCircle2, AlertCircle, Loader2 } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type InvestorDocumentStatus = "not_uploaded" | "uploading" | "uploaded" | "verified" | "rejected";
+export type LenderDocumentStatus = "not_uploaded" | "uploading" | "uploaded" | "verified" | "rejected";
 
-interface InvestorDocumentUploadCardProps {
+interface LenderDocumentUploadCardProps {
   title: string;
   description: string;
   required?: boolean;
-  status: InvestorDocumentStatus;
+  status: LenderDocumentStatus;
   fileName?: string;
   acceptedFormats?: string;
   maxSize?: string;
@@ -43,7 +43,7 @@ const statusConfig = {
   },
 };
 
-export function InvestorDocumentUploadCard({
+export function LenderDocumentUploadCard({
   title,
   description,
   required = false,
@@ -54,7 +54,7 @@ export function InvestorDocumentUploadCard({
   onUpload,
   onRemove,
   rejectionReason,
-}: InvestorDocumentUploadCardProps) {
+}: LenderDocumentUploadCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const config = statusConfig[status];

@@ -1,8 +1,8 @@
 // Re-export types and configs from specific files
-export type { NavItem, NavGroup } from "./navigation-investor";
-export { investorNavigationConfig } from "./navigation-investor";
+export type { NavItem, NavGroup } from "./navigation-lender";
+export { lenderNavigationConfig } from "./navigation-lender";
 export { developerNavigationConfig } from "./navigation-developer";
 
-// Default export for backward compatibility (investor config)
-import { investorNavigationConfig } from "./navigation-investor";
-export const navigationConfig = investorNavigationConfig;
+// Default export for backward compatibility (lender config)
+import { lenderNavigationConfig } from "./navigation-lender";
+export const navigationConfig = lenderNavigationConfig;

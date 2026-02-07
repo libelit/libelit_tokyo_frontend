@@ -21,7 +21,7 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-export const investorNavigationConfig: NavGroup[] = [
+export const lenderNavigationConfig: NavGroup[] = [
   {
     items: [
       { title: "Home", href: "/dashboard", icon: Home },

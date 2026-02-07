@@ -32,7 +32,7 @@ const mockProject = {
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
-      <DashboardHeader title="Investor Dashboard" subtitle="Superfund" />
+      <DashboardHeader title="Lender Dashboard" subtitle="Superfund" />
 
       <ConnectWallet />
 
