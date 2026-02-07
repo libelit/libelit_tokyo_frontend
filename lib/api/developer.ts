@@ -16,6 +16,13 @@ import {
   ProjectDocumentsResponse,
   SubmitProjectResponse,
   DeleteResponse,
+  CreateMilestoneData,
+  MilestoneListResponse,
+  MilestoneStoreResponse,
+  MilestoneActionResponse,
+  UploadProofData,
+  ProofListResponse,
+  ProofUploadResponse,
 } from "../types/developer";
 
 // Developer Profile Service
@@ -158,6 +165,65 @@ export const projectDocumentsService = {
   ): Promise<ApiResponse<DeleteResponse>> {
     return apiClient.delete<DeleteResponse>(
       `/developer/projects/${projectId}/documents/${documentId}`
+    );
+  },
+};
+
+// Project Milestones Service
+export const milestonesService = {
+  async list(projectId: number): Promise<ApiResponse<MilestoneListResponse>> {
+    return apiClient.get<MilestoneListResponse>(
+      `/developer/projects/${projectId}/milestones`
+    );
+  },
+
+  async save(
+    projectId: number,
+    milestones: CreateMilestoneData[]
+  ): Promise<ApiResponse<MilestoneStoreResponse>> {
+    return apiClient.post<MilestoneStoreResponse>(
+      `/developer/projects/${projectId}/milestones`,
+      { milestones }
+    );
+  },
+
+  async complete(
+    projectId: number,
+    milestoneId: number,
+    proofs: UploadProofData[]
+  ): Promise<ApiResponse<MilestoneActionResponse>> {
+    const formData = new FormData();
+    proofs.forEach((proof, index) => {
+      formData.append(`proofs[${index}][proof_type]`, proof.proof_type);
+      formData.append(`proofs[${index}][title]`, proof.title);
+      if (proof.description) {
+        formData.append(`proofs[${index}][description]`, proof.description);
+      }
+      formData.append(`proofs[${index}][file]`, proof.file);
+    });
+
+    return apiClient.upload<MilestoneActionResponse>(
+      `/developer/projects/${projectId}/milestones/${milestoneId}/complete`,
+      formData
+    );
+  },
+
+  async listProofs(
+    projectId: number,
+    milestoneId: number
+  ): Promise<ApiResponse<ProofListResponse>> {
+    return apiClient.get<ProofListResponse>(
+      `/developer/projects/${projectId}/milestones/${milestoneId}/proofs`
+    );
+  },
+
+  async deleteProof(
+    projectId: number,
+    milestoneId: number,
+    proofId: number
+  ): Promise<ApiResponse<DeleteResponse>> {
+    return apiClient.delete<DeleteResponse>(
+      `/developer/projects/${projectId}/milestones/${milestoneId}/proofs/${proofId}`
     );
   },
 };

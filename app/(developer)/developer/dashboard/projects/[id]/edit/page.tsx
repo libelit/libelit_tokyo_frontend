@@ -43,6 +43,10 @@ interface ProjectFormData {
   ltvRatio: string;
 }
 
+type ProjectFormErrors = {
+  [K in keyof ProjectFormData]?: string;
+};
+
 export default function EditProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -62,7 +66,7 @@ export default function EditProjectPage() {
     loanTermMonths: "",
     ltvRatio: "",
   });
-  const [errors, setErrors] = useState<Partial<ProjectFormData>>({});
+  const [errors, setErrors] = useState<ProjectFormErrors>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -120,7 +124,7 @@ export default function EditProjectPage() {
   };
 
   const validateForm = (): boolean => {
-    const newErrors: Partial<ProjectFormData> = {};
+    const newErrors: ProjectFormErrors = {};
 
     if (!formData.title.trim()) newErrors.title = "Project title is required";
     if (!formData.projectType) newErrors.projectType = "Project type is required";

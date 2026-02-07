@@ -228,3 +228,120 @@ export interface DeleteResponse {
   success: boolean;
   message: string;
 }
+
+// Milestone Types
+export type MilestoneStatus =
+  | 'pending'
+  | 'proof_submitted'
+  | 'approved'
+  | 'rejected'
+  | 'paid';
+
+export type MilestoneProofType =
+  | 'photo'
+  | 'invoice'
+  | 'inspection_report'
+  | 'bank_statement'
+  | 'other';
+
+export interface MilestoneProof {
+  id: number;
+  milestone_id: number;
+  proof_type: MilestoneProofType;
+  proof_type_label: string;
+  title: string;
+  description: string | null;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  file_url: string;
+  uploaded_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectMilestone {
+  id: number;
+  project_id: number;
+  title: string;
+  description: string | null;
+  sequence: number;
+  amount: number;
+  percentage: number;
+  status: MilestoneStatus;
+  status_label: string;
+  due_date: string | null;
+  proof_submitted_at: string | null;
+  approved_at: string | null;
+  approved_by: number | null;
+  paid_at: string | null;
+  payment_reference: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  proofs?: MilestoneProof[];
+  proofs_count?: number;
+  can_complete: boolean;
+}
+
+export interface MilestoneStatistics {
+  total_milestones: number;
+  completed_milestones: number;
+  progress_percentage: number;
+  total_amount: number;
+  paid_amount: number;
+  funding_goal: number;
+  allocation_complete: boolean;
+}
+
+export interface CreateMilestoneData {
+  title: string;
+  description?: string;
+  amount: number;
+  due_date?: string;
+}
+
+export interface MilestoneListResponse {
+  success: boolean;
+  data: {
+    milestones: ProjectMilestone[];
+    statistics: MilestoneStatistics;
+  };
+}
+
+export interface MilestoneStoreResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    milestones: ProjectMilestone[];
+    count: number;
+  };
+}
+
+export interface MilestoneActionResponse {
+  success: boolean;
+  message: string;
+  data?: ProjectMilestone;
+}
+
+export interface UploadProofData {
+  proof_type: MilestoneProofType;
+  title: string;
+  description?: string;
+  file: File;
+}
+
+export interface ProofListResponse {
+  success: boolean;
+  data: {
+    proofs: MilestoneProof[];
+    count: number;
+  };
+}
+
+export interface ProofUploadResponse {
+  success: boolean;
+  message: string;
+  data?: MilestoneProof[];
+}

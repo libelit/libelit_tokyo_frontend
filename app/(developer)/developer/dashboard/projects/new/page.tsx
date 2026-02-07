@@ -55,6 +55,10 @@ interface ProjectFormData {
   ltvRatio: string;
 }
 
+type ProjectFormErrors = {
+  [K in keyof ProjectFormData]?: string;
+};
+
 const initialFormData: ProjectFormData = {
   title: "",
   projectType: "",
@@ -73,7 +77,7 @@ export default function CreateProjectPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<ProjectFormData>(initialFormData);
-  const [errors, setErrors] = useState<Partial<ProjectFormData>>({});
+  const [errors, setErrors] = useState<ProjectFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateFormData = (field: keyof ProjectFormData, value: string) => {
@@ -85,7 +89,7 @@ export default function CreateProjectPage() {
   };
 
   const validateStep = (step: number): boolean => {
-    const newErrors: Partial<ProjectFormData> = {};
+    const newErrors: ProjectFormErrors = {};
 
     if (step === 1) {
       if (!formData.title.trim()) newErrors.title = "Project title is required";

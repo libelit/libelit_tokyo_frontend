@@ -91,21 +91,14 @@ export function KybStatusBanner({ status, rejectionReason }: KybStatusBannerProp
         </div>
         {config.showCta && (
           <div className="flex-shrink-0">
-            {status === "not_started" || status === "rejected" ? (
+            {(status === "not_started" || status === "rejected") && (
               <Link href="/developer/dashboard/kyb">
                 <Button className="bg-[#E86A33] hover:bg-[#d55a25]">
                   {config.ctaText}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
-            ) : status === "approved" ? (
-              <Link href="/developer/dashboard/projects/new">
-                <Button className="bg-[#E86A33] hover:bg-[#d55a25]">
-                  {config.ctaText}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-            ) : null}
+            )}
           </div>
         )}
       </div>

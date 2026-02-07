@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
-  Building2,
   MapPin,
   DollarSign,
   Calendar,
@@ -17,18 +16,35 @@ import {
   AlertCircle,
   Upload,
   Loader2,
+  Milestone,
+  Plus,
+  Trash2,
+  GripVertical,
+  Eye,
+  Image,
+  FileCheck,
+  X,
 } from "lucide-react";
 import { DeveloperHeader } from "@/components/developer/developer-header";
 import { ProjectStatusBadge } from "@/components/developer/project-status-badge";
+import { MilestoneStatusBadge } from "@/components/developer/milestone-status-badge";
 import { DocumentUploadCard, DocumentStatus } from "@/components/developer/document-upload-card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { projectsService, projectDocumentsService } from "@/lib/api/developer";
+import { projectsService, projectDocumentsService, milestonesService } from "@/lib/api/developer";
 import {
   Project,
   Document,
   DocumentType,
   DocumentChecklistItem,
+  ProjectMilestone,
+  MilestoneStatistics,
+  CreateMilestoneData,
+  MilestoneProof,
+  MilestoneProofType,
 } from "@/lib/types/developer";
 import { toast } from "sonner";
 
@@ -81,7 +97,7 @@ export default function ProjectDetailsPage() {
   const router = useRouter();
   const projectId = Number(params.id);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "documents">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "documents" | "milestones">("overview");
   const [project, setProject] = useState<Project | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
@@ -90,6 +106,26 @@ export default function ProjectDetailsPage() {
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Milestone state
+  const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
+  const [milestoneStats, setMilestoneStats] = useState<MilestoneStatistics | null>(null);
+  const [editingMilestones, setEditingMilestones] = useState<CreateMilestoneData[]>([]);
+  const [isEditingMilestones, setIsEditingMilestones] = useState(false);
+  const [isSavingMilestones, setIsSavingMilestones] = useState(false);
+
+  // Proof management state
+  const [expandedMilestoneId, setExpandedMilestoneId] = useState<number | null>(null);
+  const [milestoneProofs, setMilestoneProofs] = useState<Record<number, MilestoneProof[]>>({});
+  const [loadingProofs, setLoadingProofs] = useState<number | null>(null);
+  const [completingMilestone, setCompletingMilestone] = useState<number | null>(null);
+  const [showCompleteDialog, setShowCompleteDialog] = useState<number | null>(null);
+  const [proofsList, setProofsList] = useState<{
+    proof_type: MilestoneProofType;
+    title: string;
+    description: string;
+    file: File | null;
+  }[]>([{ proof_type: "photo", title: "", description: "", file: null }]);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -120,14 +156,26 @@ export default function ProjectDetailsPage() {
     }
   }, [projectId]);
 
+  const fetchMilestones = useCallback(async () => {
+    try {
+      const response = await milestonesService.list(projectId);
+      if (response.data?.success) {
+        setMilestones(response.data.data.milestones);
+        setMilestoneStats(response.data.data.statistics);
+      }
+    } catch (error) {
+      console.error("Error fetching milestones:", error);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchProject(), fetchDocuments()]);
+      await Promise.all([fetchProject(), fetchDocuments(), fetchMilestones()]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchProject, fetchDocuments]);
+  }, [fetchProject, fetchDocuments, fetchMilestones]);
 
   const canEdit = project?.status === "draft" || project?.status === "rejected";
   const canSubmit = project?.status === "draft";
@@ -213,6 +261,179 @@ export default function ProjectDetailsPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Milestone management functions
+  const startEditingMilestones = () => {
+    if (milestones.length > 0) {
+      setEditingMilestones(
+        milestones.map((m) => ({
+          title: m.title,
+          description: m.description || "",
+          amount: m.amount,
+          due_date: m.due_date || "",
+        }))
+      );
+    } else {
+      setEditingMilestones([{ title: "", description: "", amount: 0, due_date: "" }]);
+    }
+    setIsEditingMilestones(true);
+  };
+
+  const cancelEditingMilestones = () => {
+    setEditingMilestones([]);
+    setIsEditingMilestones(false);
+  };
+
+  const addMilestone = () => {
+    setEditingMilestones([
+      ...editingMilestones,
+      { title: "", description: "", amount: 0, due_date: "" },
+    ]);
+  };
+
+  const removeMilestone = (index: number) => {
+    setEditingMilestones(editingMilestones.filter((_, i) => i !== index));
+  };
+
+  const updateMilestone = (index: number, field: keyof CreateMilestoneData, value: string | number) => {
+    const updated = [...editingMilestones];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditingMilestones(updated);
+  };
+
+  const calculateMilestoneTotal = () => {
+    return editingMilestones.reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
+  };
+
+  const saveMilestones = async () => {
+    // Validate
+    const emptyTitles = editingMilestones.some((m) => !m.title.trim());
+    if (emptyTitles) {
+      toast.error("All milestones must have a title");
+      return;
+    }
+
+    const zeroAmounts = editingMilestones.some((m) => !m.amount || m.amount <= 0);
+    if (zeroAmounts) {
+      toast.error("All milestones must have an amount greater than 0");
+      return;
+    }
+
+    const total = calculateMilestoneTotal();
+    const fundingGoal = project?.funding_goal || 0;
+    if (Math.abs(total - fundingGoal) > 0.01) {
+      toast.error(`Total milestone amounts ($${total.toLocaleString()}) must equal funding goal ($${fundingGoal.toLocaleString()})`);
+      return;
+    }
+
+    setIsSavingMilestones(true);
+    try {
+      const response = await milestonesService.save(projectId, editingMilestones);
+      if (response.data?.success) {
+        toast.success("Milestones saved successfully");
+        setIsEditingMilestones(false);
+        await fetchMilestones();
+      } else {
+        toast.error(response.data?.message || "Failed to save milestones");
+      }
+    } catch (error) {
+      console.error("Error saving milestones:", error);
+      toast.error("Failed to save milestones");
+    } finally {
+      setIsSavingMilestones(false);
+    }
+  };
+
+  // Proof management functions
+  const fetchProofs = async (milestoneId: number) => {
+    setLoadingProofs(milestoneId);
+    try {
+      const response = await milestonesService.listProofs(projectId, milestoneId);
+      if (response.data?.success) {
+        setMilestoneProofs((prev) => ({
+          ...prev,
+          [milestoneId]: response.data!.data.proofs,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching proofs:", error);
+    } finally {
+      setLoadingProofs(null);
+    }
+  };
+
+  const toggleMilestoneExpand = async (milestoneId: number) => {
+    if (expandedMilestoneId === milestoneId) {
+      setExpandedMilestoneId(null);
+    } else {
+      setExpandedMilestoneId(milestoneId);
+      if (!milestoneProofs[milestoneId]) {
+        await fetchProofs(milestoneId);
+      }
+    }
+  };
+
+  const resetCompleteDialog = () => {
+    setProofsList([{ proof_type: "photo", title: "", description: "", file: null }]);
+    setShowCompleteDialog(null);
+  };
+
+  const addProofToList = () => {
+    setProofsList([...proofsList, { proof_type: "photo", title: "", description: "", file: null }]);
+  };
+
+  const removeProofFromList = (index: number) => {
+    if (proofsList.length > 1) {
+      setProofsList(proofsList.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateProofInList = (index: number, field: string, value: string | File | null) => {
+    const updated = [...proofsList];
+    updated[index] = { ...updated[index], [field]: value };
+    setProofsList(updated);
+  };
+
+  const handleCompleteMilestone = async (milestoneId: number) => {
+    // Validate all proofs have title and file
+    const invalidProofs = proofsList.some((p) => !p.title || !p.file);
+    if (invalidProofs) {
+      toast.error("All proofs must have a title and file");
+      return;
+    }
+
+    setCompletingMilestone(milestoneId);
+    try {
+      const proofsToUpload = proofsList.map((p) => ({
+        proof_type: p.proof_type,
+        title: p.title,
+        description: p.description || undefined,
+        file: p.file!,
+      }));
+
+      const response = await milestonesService.complete(projectId, milestoneId, proofsToUpload);
+      if (response.data?.success) {
+        toast.success("Milestone completed and submitted for review");
+        resetCompleteDialog();
+        await fetchMilestones();
+      } else {
+        toast.error(response.data?.message || "Failed to complete milestone");
+      }
+    } catch (error) {
+      console.error("Error completing milestone:", error);
+      toast.error("Failed to complete milestone");
+    } finally {
+      setCompletingMilestone(null);
+    }
+  };
+
+  const proofTypeOptions: { value: MilestoneProofType; label: string }[] = [
+    { value: "photo", label: "Photo" },
+    { value: "invoice", label: "Invoice" },
+    { value: "inspection_report", label: "Inspection Report" },
+    { value: "bank_statement", label: "Bank Statement" },
+    { value: "other", label: "Other Document" },
+  ];
 
   if (isLoading) {
     return (
@@ -311,6 +532,21 @@ export default function ProjectDetailsPage() {
             }`}
           >
             Overview
+          </button>
+          <button
+            onClick={() => setActiveTab("milestones")}
+            className={`pb-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === "milestones"
+                ? "border-[#E86A33] text-[#E86A33]"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Milestones
+            {milestones.length > 0 && (
+              <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">
+                {milestones.length}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab("documents")}
@@ -465,6 +701,487 @@ export default function ProjectDetailsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "milestones" && (
+        <div className="space-y-6">
+          {/* Milestone Stats */}
+          <div className="rounded-xl border bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Milestone className="h-5 w-5 text-[#E86A33]" />
+                  Project Milestones
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Define payment milestones for your project. Total must equal the funding goal.
+                </p>
+              </div>
+              {canEdit && !isEditingMilestones && (
+                <Button
+                  onClick={startEditingMilestones}
+                  variant="outline"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  {milestones.length > 0 ? "Edit Milestones" : "Add Milestones"}
+                </Button>
+              )}
+            </div>
+
+            {milestoneStats && (
+              <>
+                {/* Progress Bar */}
+                {milestoneStats.total_milestones > 0 && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-600">Overall Progress</span>
+                      <span className="text-sm font-medium">{milestoneStats.progress_percentage}%</span>
+                    </div>
+                    <Progress value={milestoneStats.progress_percentage} className="h-3" />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="text-sm text-gray-500">Total Milestones</p>
+                    <p className="text-lg font-semibold">{milestoneStats.total_milestones}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Completed</p>
+                    <p className="text-lg font-semibold text-green-600">{milestoneStats.completed_milestones}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Paid Amount</p>
+                    <p className="text-lg font-semibold text-green-600">${milestoneStats.paid_amount.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Funding Goal</p>
+                    <p className="text-lg font-semibold">${milestoneStats.funding_goal.toLocaleString()}</p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {milestoneStats && !milestoneStats.allocation_complete && milestones.length > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                <p className="text-sm text-amber-700">
+                  Milestone total (${milestoneStats.total_amount.toLocaleString()}) does not match funding goal (${milestoneStats.funding_goal.toLocaleString()})
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Editing Mode */}
+          {isEditingMilestones ? (
+            <div className="rounded-xl border bg-white p-6 shadow-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Edit Milestones</h3>
+                <div className="text-sm">
+                  <span className={calculateMilestoneTotal() === project?.funding_goal ? "text-green-600" : "text-amber-600"}>
+                    Total: ${calculateMilestoneTotal().toLocaleString()}
+                  </span>
+                  <span className="text-gray-400 mx-2">/</span>
+                  <span className="text-gray-600">Goal: ${project?.funding_goal.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {editingMilestones.map((milestone, index) => (
+                <div key={index} className="p-4 border rounded-lg space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <GripVertical className="h-5 w-5 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-500">Milestone {index + 1}</span>
+                    </div>
+                    {editingMilestones.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeMilestone(index)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`title-${index}`}>Title *</Label>
+                      <Input
+                        id={`title-${index}`}
+                        value={milestone.title}
+                        onChange={(e) => updateMilestone(index, "title", e.target.value)}
+                        placeholder="e.g., Foundation Complete"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`amount-${index}`}>Amount ($) *</Label>
+                        <Input
+                          id={`amount-${index}`}
+                          type="number"
+                          value={milestone.amount || ""}
+                          onChange={(e) => updateMilestone(index, "amount", parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`due_date-${index}`}>Due Date</Label>
+                        <Input
+                          id={`due_date-${index}`}
+                          type="date"
+                          value={milestone.due_date || ""}
+                          onChange={(e) => updateMilestone(index, "due_date", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor={`description-${index}`}>Description</Label>
+                    <Textarea
+                      id={`description-${index}`}
+                      value={milestone.description || ""}
+                      onChange={(e) => updateMilestone(index, "description", e.target.value)}
+                      placeholder="Describe what will be completed in this milestone..."
+                      className="h-20"
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <Button
+                variant="outline"
+                onClick={addMilestone}
+                className="w-full border-dashed"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Milestone
+              </Button>
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button variant="outline" onClick={cancelEditingMilestones}>
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-[#E86A33] hover:bg-[#d55a25]"
+                  onClick={saveMilestones}
+                  disabled={isSavingMilestones}
+                >
+                  {isSavingMilestones ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Milestones"
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Milestone List */}
+              {milestones.length > 0 ? (
+                <div className="space-y-4">
+                  {milestones.map((milestone, index) => {
+                    const isExpanded = expandedMilestoneId === milestone.id;
+                    const proofs = milestoneProofs[milestone.id] || [];
+                    const isLoadingThisProofs = loadingProofs === milestone.id;
+
+                    return (
+                      <div
+                        key={milestone.id}
+                        className="rounded-xl border bg-white shadow-sm overflow-hidden"
+                      >
+                        <div className="p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-4 flex-1">
+                              <div className={`flex items-center justify-center w-8 h-8 rounded-full font-medium text-sm ${
+                                milestone.status === "paid" || milestone.status === "approved"
+                                  ? "bg-green-100 text-green-700"
+                                  : milestone.status === "proof_submitted"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : milestone.status === "rejected"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-gray-100 text-gray-600"
+                              }`}>
+                                {milestone.status === "paid" || milestone.status === "approved" ? (
+                                  <CheckCircle2 className="h-5 w-5" />
+                                ) : (
+                                  index + 1
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-1">
+                                  <h3 className="font-semibold">{milestone.title}</h3>
+                                  <MilestoneStatusBadge status={milestone.status} />
+                                </div>
+                                {milestone.description && (
+                                  <p className="text-sm text-gray-600 mb-3">{milestone.description}</p>
+                                )}
+                                <div className="flex flex-wrap gap-4 text-sm">
+                                  <div>
+                                    <span className="text-gray-500">Amount:</span>{" "}
+                                    <span className="font-medium">${milestone.amount.toLocaleString()}</span>
+                                    <span className="text-gray-400 ml-1">({milestone.percentage}%)</span>
+                                  </div>
+                                  {milestone.due_date && (
+                                    <div>
+                                      <span className="text-gray-500">Due:</span>{" "}
+                                      <span className="font-medium">
+                                        {new Date(milestone.due_date).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {milestone.proofs_count !== undefined && milestone.proofs_count > 0 && (
+                                    <div className="text-blue-600">
+                                      <FileCheck className="inline h-4 w-4 mr-1" />
+                                      {milestone.proofs_count} proof(s)
+                                    </div>
+                                  )}
+                                  {milestone.paid_at && (
+                                    <div className="text-green-600">
+                                      <CheckCircle2 className="inline h-4 w-4 mr-1" />
+                                      Paid on {new Date(milestone.paid_at).toLocaleDateString()}
+                                    </div>
+                                  )}
+                                </div>
+                                {milestone.rejection_reason && (
+                                  <div className="mt-3 p-3 bg-red-50 rounded-lg">
+                                    <p className="text-sm text-red-700">
+                                      <strong>Rejection reason:</strong> {milestone.rejection_reason}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 ml-4">
+                              {milestone.can_complete && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => setShowCompleteDialog(milestone.id)}
+                                  className="bg-[#E86A33] hover:bg-[#d55a25]"
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                                  Complete Milestone
+                                </Button>
+                              )}
+                              {milestone.proofs_count !== undefined && milestone.proofs_count > 0 && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => toggleMilestoneExpand(milestone.id)}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  {isExpanded ? "Hide" : "View"} Proofs
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Complete Milestone Dialog */}
+                        {showCompleteDialog === milestone.id && (
+                          <div className="border-t bg-gray-50 p-6">
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <h4 className="font-medium">Complete Milestone</h4>
+                                <p className="text-sm text-gray-500">Upload proof(s) of completion to mark this milestone as done</p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={resetCompleteDialog}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {/* Proofs List */}
+                            <div className="space-y-4">
+                              {proofsList.map((proof, idx) => (
+                                <div key={idx} className="p-4 bg-white border rounded-lg">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <span className="text-sm font-medium text-gray-600">Proof {idx + 1}</span>
+                                    {proofsList.length > 1 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeProofFromList(idx)}
+                                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                      <Label>Proof Type *</Label>
+                                      <select
+                                        value={proof.proof_type}
+                                        onChange={(e) => updateProofInList(idx, "proof_type", e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-md text-sm bg-white"
+                                      >
+                                        {proofTypeOptions.map((opt) => (
+                                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <Label>Title *</Label>
+                                      <Input
+                                        value={proof.title}
+                                        onChange={(e) => updateProofInList(idx, "title", e.target.value)}
+                                        placeholder="e.g., Foundation inspection report"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="mt-3">
+                                    <Label>Description</Label>
+                                    <Textarea
+                                      value={proof.description}
+                                      onChange={(e) => updateProofInList(idx, "description", e.target.value)}
+                                      placeholder="Additional details..."
+                                      className="h-16"
+                                    />
+                                  </div>
+                                  <div className="mt-3">
+                                    <Label>File *</Label>
+                                    <Input
+                                      type="file"
+                                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                      onChange={(e) => updateProofInList(idx, "file", e.target.files?.[0] || null)}
+                                    />
+                                    {proof.file && (
+                                      <p className="text-xs text-green-600 mt-1">Selected: {proof.file.name}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Add More Button */}
+                            <Button
+                              variant="outline"
+                              onClick={addProofToList}
+                              className="w-full mt-4 border-dashed"
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add Another Proof
+                            </Button>
+
+                            {/* Submit Button */}
+                            <div className="mt-6 flex justify-end gap-3">
+                              <Button variant="outline" onClick={resetCompleteDialog}>
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={() => handleCompleteMilestone(milestone.id)}
+                                disabled={completingMilestone === milestone.id}
+                                className="bg-[#E86A33] hover:bg-[#d55a25]"
+                              >
+                                {completingMilestone === milestone.id ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Submitting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    Complete & Submit for Review
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+
+                            <p className="text-xs text-gray-500 mt-4">
+                              PDF, JPG, PNG, DOC, DOCX files accepted (max 10MB each)
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Proofs List */}
+                        {isExpanded && (
+                          <div className="border-t bg-gray-50 p-6">
+                            <h4 className="font-medium mb-4">Submitted Proofs</h4>
+                            {isLoadingThisProofs ? (
+                              <div className="flex items-center justify-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin text-[#E86A33]" />
+                              </div>
+                            ) : proofs.length > 0 ? (
+                              <div className="space-y-3">
+                                {proofs.map((proof) => (
+                                  <div
+                                    key={proof.id}
+                                    className="flex items-center justify-between p-4 bg-white rounded-lg border"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="p-2 bg-gray-100 rounded">
+                                        <Image className="h-5 w-5 text-gray-600" />
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-sm">{proof.title}</p>
+                                        <p className="text-xs text-gray-500">
+                                          {proof.proof_type_label} • {proof.file_name}
+                                        </p>
+                                        {proof.description && (
+                                          <p className="text-xs text-gray-400 mt-1">{proof.description}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <a
+                                      href={proof.file_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                    >
+                                      View
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500 text-center py-4">No proofs submitted yet</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-xl border bg-white p-12 text-center">
+                  <Milestone className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Milestones Defined</h3>
+                  <p className="text-gray-500 mb-4">
+                    Define payment milestones to track project progress and receive payments.
+                  </p>
+                  {canEdit && (
+                    <Button onClick={startEditingMilestones} className="bg-[#E86A33] hover:bg-[#d55a25]">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Milestones
+                    </Button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Info Box */}
+          <div className="rounded-xl border bg-blue-50 border-blue-200 p-6">
+            <h3 className="font-medium text-blue-800 mb-2">About Milestones</h3>
+            <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
+              <li>Milestones define the payment schedule for your project</li>
+              <li>Total milestone amounts must equal your funding goal</li>
+              <li>You&apos;ll need to submit proof of completion for each milestone</li>
+              <li>Payments are released after milestone approval</li>
+            </ul>
           </div>
         </div>
       )}
