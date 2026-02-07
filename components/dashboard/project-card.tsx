@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2 } from "lucide-react";
@@ -86,9 +87,11 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </div>
         </div>
 
-        <Button className="w-full bg-[#E86A33] hover:bg-[#d55a23] text-white text-sm">
-          View Details
-        </Button>
+        <Link href={`/dashboard/marketplace/${project.id}`}>
+          <Button className="w-full bg-[#E86A33] hover:bg-[#d55a23] text-white text-sm">
+            View Details
+          </Button>
+        </Link>
       </CardContent>
     </Card>
   );
