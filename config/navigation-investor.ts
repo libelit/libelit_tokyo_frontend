@@ -7,6 +7,7 @@ import {
   BookOpen,
   Settings,
   Layout,
+  ShieldCheck,
   LucideIcon,
 } from "lucide-react";
 
@@ -24,6 +25,7 @@ export const investorNavigationConfig: NavGroup[] = [
   {
     items: [
       { title: "Home", href: "/dashboard", icon: Home },
+      { title: "KYB Verification", href: "/dashboard/kyb", icon: ShieldCheck },
       { title: "Wallet", href: "/dashboard/wallet", icon: Wallet },
       { title: "Marketplace", href: "/dashboard/marketplace", icon: Store },
       { title: "Portfolio", href: "/dashboard/portfolio", icon: PieChart },
