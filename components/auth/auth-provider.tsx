@@ -36,6 +36,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     authService.logout();
     setUser(null);
+
+    // Clear demo data on logout
+    localStorage.removeItem("libelit_loan_proposals");
+    localStorage.removeItem("libelit_proposals_seeded");
   };
 
   const value: AuthContextType = {

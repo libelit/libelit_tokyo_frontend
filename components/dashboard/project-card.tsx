@@ -2,7 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2 } from "lucide-react";
+import { Building2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { ProposalStatus } from "@/lib/types/loan-proposal";
 
 export interface Project {
   id: string;
@@ -19,9 +20,10 @@ export interface Project {
 
 interface ProjectCardProps {
   project: Project;
+  proposalStatus?: ProposalStatus | null;
 }
 
-export function ProjectCard({ project }: ProjectCardProps) {
+export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -32,6 +34,37 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   const formatPrice = (value: number) => {
     return `$ ${value.toLocaleString("en-US").replace(/,/g, " ")}`;
+  };
+
+  const getStatusBadge = () => {
+    if (!proposalStatus) return null;
+
+    switch (proposalStatus) {
+      case "accepted":
+        return (
+          <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
+            <CheckCircle2 className="h-3 w-3" />
+            Accepted
+          </div>
+        );
+      case "rejected":
+        return (
+          <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full">
+            <XCircle className="h-3 w-3" />
+            Rejected
+          </div>
+        );
+      case "submitted":
+      case "under_review":
+        return (
+          <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded-full">
+            <Clock className="h-3 w-3" />
+            Pending
+          </div>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -50,6 +83,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
               <Building2 className="h-12 w-12 text-muted-foreground" />
             </div>
           )}
+          {getStatusBadge()}
         </div>
 
         <div className="space-y-1">

@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, CalendarCheck, ChevronLeft, ChevronRight, Maximize2, ArrowRight, X } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, CalendarCheck, ChevronLeft, ChevronRight, Maximize2, ArrowRight, X, XCircle, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoanProposalModal, LoanProposalFormData } from "@/components/dashboard/loan-proposal-modal";
+import { loanProposalsService, LoanProposal, SecurityPackageType } from "@/lib/api/loan-proposals";
+import { toast } from "sonner";
 
 // Hardcoded project data - in real app this would come from API
 const projectData = {
@@ -93,6 +95,33 @@ export default function ProjectDetailsPage() {
   const [showLoanProposalModal, setShowLoanProposalModal] = useState(false);
   const [proposalSubmitted, setProposalSubmitted] = useState(false);
 
+  // Proposal state
+  const [proposal, setProposal] = useState<LoanProposal | null>(null);
+  const [isLoadingProposal, setIsLoadingProposal] = useState(true);
+
+  // Mock lender ID - in real app this would come from auth context
+  const MOCK_LENDER_ID = "lender-1";
+
+  // Fetch existing proposal on page load
+  const fetchProposal = useCallback(async () => {
+    setIsLoadingProposal(true);
+    try {
+      const result = await loanProposalsService.getByProjectAndLender(projectData.id, MOCK_LENDER_ID);
+      if (result?.success && result.data) {
+        setProposal(result.data);
+        setProposalSubmitted(true);
+      }
+    } catch (error) {
+      console.error("Error fetching proposal:", error);
+    } finally {
+      setIsLoadingProposal(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProposal();
+  }, [fetchProposal]);
+
   const nextAboutImage = () => {
     setAboutImageIndex((prev) => (prev + 1) % aboutGalleryImages.length);
   };
@@ -127,10 +156,36 @@ export default function ProjectDetailsPage() {
     setProgressImageIndex((prev) => (prev - 1 + progressGalleryImages.length) % progressGalleryImages.length);
   };
 
-  const handleLoanProposalSubmit = (data: LoanProposalFormData) => {
-    // TODO: Integrate with API to submit loan proposal
-    console.log("Loan proposal submitted:", data);
-    setProposalSubmitted(true);
+  const handleLoanProposalSubmit = async (data: LoanProposalFormData) => {
+    try {
+      const response = await loanProposalsService.create(
+        {
+          projectId: projectData.id,
+          amountOffered: parseFloat(data.amountOffered),
+          currency: data.currency,
+          interestRate: parseFloat(data.interestRate),
+          maturityDate: data.maturityDate,
+          securityPackage: data.securityPackage as SecurityPackageType[],
+          maxLTV: parseFloat(data.maxLTV),
+          bidExpiry: data.bidExpiry,
+          conditions: data.conditions || undefined,
+        },
+        MOCK_LENDER_ID,
+        "First National Bank",
+        data.documents // Pass uploaded documents
+      );
+
+      if (response.success) {
+        setProposal(response.data);
+        setProposalSubmitted(true);
+        toast.success("Loan proposal submitted successfully");
+      } else {
+        toast.error(response.message || "Failed to submit proposal");
+      }
+    } catch (error) {
+      console.error("Error submitting proposal:", error);
+      toast.error("Failed to submit proposal");
+    }
   };
 
   const tabs = [
@@ -236,11 +291,29 @@ export default function ProjectDetailsPage() {
               </div>
 
               {/* CTA Button or Status */}
-              {proposalSubmitted ? (
-                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-full">
+              {isLoadingProposal ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                  <span className="text-sm text-gray-500">Loading...</span>
+                </div>
+              ) : proposal?.status === "accepted" ? (
+                <Link href="/dashboard/proposals" className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-full hover:bg-green-100 transition-colors">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">Proposal Accepted</span>
+                  <ExternalLink className="h-3.5 w-3.5 text-green-600" />
+                </Link>
+              ) : proposal?.status === "rejected" ? (
+                <Link href="/dashboard/proposals" className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 transition-colors">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <span className="text-sm font-medium text-red-700">Proposal Rejected</span>
+                  <ExternalLink className="h-3.5 w-3.5 text-red-600" />
+                </Link>
+              ) : proposalSubmitted ? (
+                <Link href="/dashboard/proposals" className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-full hover:bg-amber-100 transition-colors">
                   <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
                   <span className="text-sm font-medium text-amber-700">Submitted for Review</span>
-                </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-amber-600" />
+                </Link>
               ) : (
                 <Button
                   onClick={() => setShowLoanProposalModal(true)}

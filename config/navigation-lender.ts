@@ -8,6 +8,7 @@ import {
   Settings,
   Layout,
   ShieldCheck,
+  FileText,
   LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ export const lenderNavigationConfig: NavGroup[] = [
       { title: "KYB Verification", href: "/dashboard/kyb", icon: ShieldCheck },
       { title: "Wallet", href: "/dashboard/wallet", icon: Wallet },
       { title: "Marketplace", href: "/dashboard/marketplace", icon: Store },
+      { title: "My Proposals", href: "/dashboard/proposals", icon: FileText },
       { title: "Portfolio", href: "/dashboard/portfolio", icon: PieChart },
       { title: "Drawdown", href: "/dashboard/drawdown", icon: TrendingDown },
     ],

@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { ProjectCard, Project } from "@/components/dashboard/project-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, SlidersHorizontal } from "lucide-react";
+import { loanProposalsService } from "@/lib/api/loan-proposals";
+import { ProposalStatus } from "@/lib/types/loan-proposal";
+
+// Mock lender ID - in real app this would come from auth context
+const MOCK_LENDER_ID = "lender-1";
 
 // Hardcoded mock projects data
 const mockProjects: Project[] = [
@@ -85,6 +90,27 @@ const mockProjects: Project[] = [
 
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [proposalStatuses, setProposalStatuses] = useState<Record<string, ProposalStatus>>({});
+
+  // Fetch proposal statuses for all projects
+  const fetchProposalStatuses = useCallback(async () => {
+    try {
+      const response = await loanProposalsService.getByLender(MOCK_LENDER_ID);
+      if (response.success) {
+        const statuses: Record<string, ProposalStatus> = {};
+        response.data.forEach((proposal) => {
+          statuses[proposal.projectId] = proposal.status;
+        });
+        setProposalStatuses(statuses);
+      }
+    } catch (error) {
+      console.error("Error fetching proposal statuses:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProposalStatuses();
+  }, [fetchProposalStatuses]);
 
   // Filter projects based on search query
   const filteredProjects = mockProjects.filter(
@@ -127,7 +153,10 @@ export default function MarketplacePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
             <div key={project.id} className="bg-white rounded-xl border p-4 shadow-sm">
-              <ProjectCard project={project} />
+              <ProjectCard
+                project={project}
+                proposalStatus={proposalStatuses[project.id] || null}
+              />
             </div>
           ))}
         </div>

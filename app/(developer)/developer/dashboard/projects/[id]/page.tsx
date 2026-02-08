@@ -28,6 +28,7 @@ import {
 import { DeveloperHeader } from "@/components/developer/developer-header";
 import { ProjectStatusBadge } from "@/components/developer/project-status-badge";
 import { MilestoneStatusBadge } from "@/components/developer/milestone-status-badge";
+import { ProjectProposalsTab } from "@/components/developer/project-proposals-tab";
 import { DocumentUploadCard, DocumentStatus } from "@/components/developer/document-upload-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,7 +98,7 @@ export default function ProjectDetailsPage() {
   const router = useRouter();
   const projectId = Number(params.id);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "documents" | "milestones">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "documents" | "milestones" | "proposals">("overview");
   const [project, setProject] = useState<Project | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
@@ -562,6 +563,16 @@ export default function ProjectDetailsPage() {
                 {requiredRemaining} required
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab("proposals")}
+            className={`pb-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === "proposals"
+                ? "border-[#E86A33] text-[#E86A33]"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Loan Proposals
           </button>
         </nav>
       </div>
@@ -1289,6 +1300,10 @@ export default function ProjectDetailsPage() {
             </ol>
           </div>
         </div>
+      )}
+
+      {activeTab === "proposals" && (
+        <ProjectProposalsTab projectId={String(2)} />
       )}
     </div>
   );
