@@ -139,8 +139,6 @@ export default function KybVerificationPage() {
     }
   }
 
-  const kybStatus: KybStatus = profile?.kyb_status || "not_started";
-
   const uploadedCount = documents.filter(
     (d) => d.status === "uploaded" || d.status === "verified"
   ).length;
@@ -149,6 +147,16 @@ export default function KybVerificationPage() {
     .filter((d) => d.required)
     .every((d) => d.status === "uploaded" || d.status === "verified");
   const progressPercentage = documents.length > 0 ? (uploadedCount / documents.length) * 100 : 0;
+
+  // Determine effective KYB status based on both profile status AND actual documents
+  // If profile says pending/under_review but no documents exist, treat as not_started
+  const profileKybStatus = profile?.kyb_status || "not_started";
+  const hasUploadedDocuments = uploadedCount > 0;
+
+  const kybStatus: KybStatus =
+    (profileKybStatus === "pending" || profileKybStatus === "under_review") && !hasUploadedDocuments
+      ? "not_started"
+      : profileKybStatus;
 
   const handleUpload = async (docType: DocumentType, file: File) => {
     setUploadingType(docType);
