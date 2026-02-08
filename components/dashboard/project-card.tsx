@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { ProposalStatus } from "@/lib/types/loan-proposal";
@@ -10,12 +10,9 @@ export interface Project {
   name: string;
   location: string;
   description: string;
-  price: number;
-  downPayment: string;
-  projectValue: number;
   loanValue: number;
-  loanDuration: number;
-  imageUrl?: string;
+  projectDuration: number;
+  coverImageUrl?: string;
 }
 
 interface ProjectCardProps {
@@ -24,6 +21,7 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
+  console.log('project-card',project);
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -71,12 +69,13 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
     <Card className="overflow-hidden shadow-none border-none">
       <CardContent className="space-y-3">
         <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
-          {project.imageUrl ? (
+          {project.coverImageUrl ? (
             <Image
-              src={project.imageUrl}
+              src={project.coverImageUrl}
               alt={project.name}
               fill
-              className="w-fit"
+              className="object-cover"
+              unoptimized
             />
           ) : (
             <div className="flex h-full items-center justify-center">
@@ -99,24 +98,16 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
 
         <div className="flex items-center justify-between">
           <span className="text-sm font-bold text-[#E86A33]">
-            {formatPrice(project.price)} (12.5%)
+            {formatPrice(project.loanValue)}
           </span>
-          <span className="text-xs text-muted-foreground">Down payment</span>
+          <span className="text-xs text-muted-foreground">Loan Amount Asked</span>
         </div>
 
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Project value:</span>
-            <span className="font-medium">{formatPrice(project.projectValue)}.00</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Loan Value:</span>
-            <span className="font-medium">{formatPrice(project.loanValue)}.00</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Loan Duration:</span>
+            <span className="text-muted-foreground">Project Duration:</span>
             <span className="font-medium text-[#E86A33]">
-              {project.loanDuration} days
+              {project.projectDuration} days
             </span>
           </div>
         </div>

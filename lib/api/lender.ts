@@ -9,7 +9,14 @@ import {
   BatchUploadLenderDocumentRequest,
   SubmitLenderKybResponse,
   DeleteResponse,
+  LenderProjectListResponse,
+  LenderProjectResponse,
 } from "../types/lender";
+import {
+  ProjectDocumentsResponse,
+  MilestoneListResponse,
+  ProjectPhotoListResponse,
+} from "../types/developer";
 
 // Lender Profile Service
 export const lenderProfileService = {
@@ -80,5 +87,57 @@ export const lenderKybService = {
 
   async submit(): Promise<ApiResponse<SubmitLenderKybResponse>> {
     return apiClient.post<SubmitLenderKybResponse>("/lender/kyb/submit");
+  },
+};
+
+// Lender Projects Service (for marketplace - viewing submitted projects)
+export const lenderProjectsService = {
+  async list(params?: {
+    search?: string;
+    project_type?: string;
+    per_page?: number;
+    page?: number;
+  }): Promise<ApiResponse<LenderProjectListResponse>> {
+    const searchParams = new URLSearchParams();
+    if (params?.search) searchParams.append("search", params.search);
+    if (params?.project_type) searchParams.append("project_type", params.project_type);
+    if (params?.per_page) searchParams.append("per_page", params.per_page.toString());
+    if (params?.page) searchParams.append("page", params.page.toString());
+
+    const queryString = searchParams.toString();
+    const endpoint = `/lender/projects${queryString ? `?${queryString}` : ""}`;
+
+    return apiClient.get<LenderProjectListResponse>(endpoint);
+  },
+
+  async get(id: number): Promise<ApiResponse<LenderProjectResponse>> {
+    return apiClient.get<LenderProjectResponse>(`/lender/projects/${id}`);
+  },
+};
+
+// Lender Project Documents Service (read-only access to project documents)
+export const lenderProjectDocumentsService = {
+  async list(projectId: number): Promise<ApiResponse<ProjectDocumentsResponse>> {
+    return apiClient.get<ProjectDocumentsResponse>(
+      `/lender/projects/${projectId}/documents`
+    );
+  },
+};
+
+// Lender Project Milestones Service (read-only access to project milestones)
+export const lenderMilestonesService = {
+  async list(projectId: number): Promise<ApiResponse<MilestoneListResponse>> {
+    return apiClient.get<MilestoneListResponse>(
+      `/lender/projects/${projectId}/milestones`
+    );
+  },
+};
+
+// Lender Project Photos Service (read-only access to project photos)
+export const lenderProjectPhotosService = {
+  async list(projectId: number): Promise<ApiResponse<ProjectPhotoListResponse>> {
+    return apiClient.get<ProjectPhotoListResponse>(
+      `/lender/projects/${projectId}/photos`
+    );
   },
 };

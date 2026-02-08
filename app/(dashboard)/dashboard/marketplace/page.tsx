@@ -2,94 +2,53 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
-import { ProjectCard, Project } from "@/components/dashboard/project-card";
+import { ProjectCard, Project as CardProject } from "@/components/dashboard/project-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, SlidersHorizontal, AlertCircle, Loader2 } from "lucide-react";
+import { Search, SlidersHorizontal, AlertCircle, Loader2, Building2 } from "lucide-react";
 import { loanProposalsService } from "@/lib/api/loan-proposals";
-import { lenderProfileService } from "@/lib/api";
+import { lenderProfileService, lenderProjectsService } from "@/lib/api";
 import { ProposalStatus } from "@/lib/types/loan-proposal";
-import type { LenderProfile, KybStatus } from "@/lib/types/lender";
+import type { LenderProfile, KybStatus, LenderProject } from "@/lib/types/lender";
 import Link from "next/link";
+import { toast } from "sonner";
 
 // Mock lender ID - in real app this would come from auth context
 const MOCK_LENDER_ID = "lender-1";
 
-// Hardcoded mock projects data
-const mockProjects: Project[] = [
-  {
-    id: "1",
-    name: "Riverside Apartments",
-    location: "Miami, FL",
-    description:
-      "Modern waterfront development featuring 24 luxury apartments with stunning ocean views and premium amenities.",
-    price: 312500,
-    downPayment: "12.5%",
-    projectValue: 2500000,
-    loanValue: 1000000,
-    loanDuration: 216,
-  },
-  {
-    id: "2",
-    name: "Green Valley Homes",
-    location: "Austin, TX",
-    description:
-      "Sustainable housing project with 12 eco-friendly single-family homes featuring solar panels and smart home technology.",
-    price: 187500,
-    downPayment: "12.5%",
-    projectValue: 1500000,
-    loanValue: 750000,
-    loanDuration: 180,
-  },
-  {
-    id: "3",
-    name: "Downtown Plaza",
-    location: "Chicago, IL",
-    description:
-      "Mixed-use commercial development in the heart of downtown, featuring retail spaces and office units.",
-    price: 625000,
-    downPayment: "12.5%",
-    projectValue: 5000000,
-    loanValue: 2500000,
-    loanDuration: 365,
-  },
-  {
-    id: "4",
-    name: "Sunset Villas",
-    location: "San Diego, CA",
-    description:
-      "Exclusive gated community with 8 Mediterranean-style villas, private pools, and landscaped gardens.",
-    price: 437500,
-    downPayment: "12.5%",
-    projectValue: 3500000,
-    loanValue: 1750000,
-    loanDuration: 270,
-  },
-  {
-    id: "5",
-    name: "Harbor View Condos",
-    location: "Seattle, WA",
-    description:
-      "Premium waterfront condominiums with 36 units offering panoramic harbor views and modern finishes.",
-    price: 250000,
-    downPayment: "12.5%",
-    projectValue: 2000000,
-    loanValue: 1000000,
-    loanDuration: 240,
-  },
-  {
-    id: "6",
-    name: "Mountain Ridge Estate",
-    location: "Denver, CO",
-    description:
-      "Luxury mountain retreat development with 6 custom-built chalets featuring ski-in/ski-out access.",
-    price: 562500,
-    downPayment: "12.5%",
-    projectValue: 4500000,
-    loanValue: 2250000,
-    loanDuration: 300,
-  },
-];
+// Helper function to calculate loan duration in days from construction dates
+function calculateLoanDuration(startDate: string | null, endDate: string | null): number {
+  if (!startDate || !endDate) return 365; // Default to 1 year
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays || 365;
+}
+
+// Helper function to map LenderProject to ProjectCard's interface
+function mapToCardProject(project: LenderProject): CardProject {
+  const location = [project.city, project.country].filter(Boolean).join(", ") || "Location not set";
+  const projectDuration = calculateLoanDuration(project.construction_start_date, project.construction_end_date);
+
+  // Calculate price as min_investment, or 12.5% of loan_amount as fallback
+  const minInvestment = typeof project.min_investment === 'string'
+    ? parseFloat(project.min_investment)
+    : project.min_investment;
+
+  // Use cover_photo_url, or first photo from inline photos array
+  const imageUrl = project.cover_photo_url || (project.photos?.[0]?.file_url);
+
+  return {
+    id: project.id.toString(),
+    name: project.title,
+    location,
+    description: project.description || "No description available",
+    loanValue: project.loan_amount,
+    projectDuration,
+    coverImageUrl: imageUrl || undefined,
+  };
+}
 
 function KybBlockedMessage({ kybStatus }: { kybStatus: KybStatus }) {
   const getMessage = () => {
@@ -153,8 +112,11 @@ export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [proposalStatuses, setProposalStatuses] = useState<Record<string, ProposalStatus>>({});
   const [profile, setProfile] = useState<LenderProfile | null>(null);
+  const [projects, setProjects] = useState<LenderProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [totalProjects, setTotalProjects] = useState(0);
 
   // Fetch lender profile to check KYB status
   useEffect(() => {
@@ -175,6 +137,46 @@ export default function MarketplacePage() {
     }
     fetchProfile();
   }, []);
+
+  // Fetch projects from API
+  const fetchProjects = useCallback(async (search?: string) => {
+    setIsLoadingProjects(true);
+    try {
+      const response = await lenderProjectsService.list({
+        search: search || undefined,
+        per_page: 50,
+      });
+      if (response.data?.success) {
+        setProjects(response.data.data);
+        setTotalProjects(response.data.meta?.total || response.data.data.length);
+      } else if (response.error) {
+        toast.error("Failed to load projects");
+      }
+    } catch (err) {
+      console.error("Error fetching projects:", err);
+      toast.error("Failed to load projects");
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  }, []);
+
+  // Fetch projects when KYB is approved
+  useEffect(() => {
+    if (profile?.kyb_status === "approved") {
+      fetchProjects();
+    }
+  }, [profile?.kyb_status, fetchProjects]);
+
+  // Debounced search
+  useEffect(() => {
+    if (profile?.kyb_status !== "approved") return;
+
+    const timer = setTimeout(() => {
+      fetchProjects(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, profile?.kyb_status, fetchProjects]);
 
   // Fetch proposal statuses for all projects
   const fetchProposalStatuses = useCallback(async () => {
@@ -198,13 +200,8 @@ export default function MarketplacePage() {
     }
   }, [fetchProposalStatuses, profile?.kyb_status]);
 
-  // Filter projects based on search query
-  const filteredProjects = mockProjects.filter(
-    (project) =>
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Map projects to card format
+  const cardProjects = projects.map(mapToCardProject);
 
   // Loading state
   if (isLoading) {
@@ -261,14 +258,25 @@ export default function MarketplacePage() {
       {/* Results Count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
-          Showing {filteredProjects.length} of {mockProjects.length} projects
+          {isLoadingProjects ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Loading projects...
+            </span>
+          ) : (
+            `Showing ${cardProjects.length} of ${totalProjects} projects`
+          )}
         </p>
       </div>
 
       {/* Projects Grid */}
-      {filteredProjects.length > 0 ? (
+      {isLoadingProjects ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-[#E86A33]" />
+        </div>
+      ) : cardProjects.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
+          {cardProjects.map((project) => (
             <div key={project.id} className="bg-white rounded-xl border p-4 shadow-sm">
               <ProjectCard
                 project={project}
@@ -277,8 +285,9 @@ export default function MarketplacePage() {
             </div>
           ))}
         </div>
-      ) : (
+      ) : searchQuery ? (
         <div className="text-center py-12 bg-white rounded-xl border">
+          <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500">No projects found matching your search.</p>
           <Button
             variant="link"
@@ -287,6 +296,14 @@ export default function MarketplacePage() {
           >
             Clear search
           </Button>
+        </div>
+      ) : (
+        <div className="text-center py-12 bg-white rounded-xl border">
+          <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No projects available</h3>
+          <p className="text-gray-500">
+            There are no investment opportunities available at the moment. Check back later.
+          </p>
         </div>
       )}
     </div>

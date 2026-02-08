@@ -1,70 +1,58 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, CalendarCheck, ChevronLeft, ChevronRight, Maximize2, ArrowRight, X, XCircle, Loader2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, ChevronLeft, ChevronRight, ArrowRight, X, XCircle, Loader2, ExternalLink, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoanProposalModal, LoanProposalFormData } from "@/components/dashboard/loan-proposal-modal";
 import { loanProposalsService, LoanProposal, SecurityPackageType } from "@/lib/api/loan-proposals";
+import {
+  lenderProjectsService,
+  lenderProjectDocumentsService,
+  lenderMilestonesService,
+} from "@/lib/api";
+import type {
+  Document,
+  ProjectMilestone,
+  MilestoneStatistics,
+} from "@/lib/types/developer";
+import type { LenderProject } from "@/lib/types/lender";
 import { toast } from "sonner";
 
-// Hardcoded project data - in real app this would come from API
-const projectData = {
-  id: "1",
-  projectId: "Project ID",
-  name: "Project Name",
-  location: "City, Country",
-  description: `Living in Wrocław, you don't need imagination to sense that housing is one of the major challenges. As the city rapidly grows, attracting both residents and businesses, the demand for quality housing continues to rise. On one hand, this presents tremendous development opportunities, while on the other, it creates a pressing need for thoughtful, sustainable housing solutions.
-
-Our investment features four semi-detached houses, each designed with modern living in mind. The properties combine contemporary architecture with practical layouts, offering comfortable living spaces for families. Each unit includes private outdoor areas, parking spaces, and access to shared green spaces.
-
-The development is strategically located with easy access to public transportation, schools, shopping centers, and recreational facilities. The neighborhood is known for its family-friendly atmosphere and growing community.`,
-  constructionStart: "21 Jun 2023",
-  constructionFinish: "21 Jun 2024",
-  loanMaturity: "30 Oct 2024",
-  developmentValue: 1000000,
-  loanValue: 1800000,
+// Hardcoded data for fields not available in API
+const hardcodedData = {
   ltv: "60%",
   loanType: "Construction",
+  loanMaturity: "30 Oct 2024", // Fallback if not calculated
   team: {
-    name: "Kamil Paczkowski",
+    name: "Project Developer",
     role: "Contractor",
-    bio: "Carlops of Carlops Ltd. with almost twenty years of experience in building high-quality houses and buildings. As a Carlops General Contractor, he directs construction teams during execution of residential and public utility buildings.",
-    imageUrl: "/team-member.jpg",
+    bio: "Experienced developer with a track record of successful real estate projects.",
   },
-  progressGallery: [
-    { id: 1, title: "Building phase", imageUrl: "/progress-1.jpg" },
-    { id: 2, title: "Finishing details", imageUrl: "/progress-2.jpg" },
-  ],
-  locationDetails: {
-    address: "Grunwaldzka 129, Wrocław, Poland",
-    mapUrl: "https://maps.google.com",
-  },
-  documents: [
-    { id: 1, name: "KRS", checked: true },
-    { id: 2, name: "NIP", checked: true },
-    { id: 3, name: "Finansowe", checked: true },
-    { id: 4, name: "Nieruchomości", checked: false },
-    { id: 5, name: "Zgody i decyzje", checked: false },
-    { id: 6, name: "Polisy", checked: false },
-  ],
-  images: {
-    main: "/project-main.jpg",
-    gallery: [
-      "/project-1.jpg",
-      "/project-2.jpg",
-      "/project-3.jpg",
-      "/project-4.jpg",
-    ],
-    about: "/project-about.jpg",
-  },
+  locationDescription: "This development is strategically located with easy access to public transportation, schools, shopping centers, and recreational facilities. The neighborhood is known for its family-friendly atmosphere and growing community.",
 };
+
+// Helper function to format date
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "TBD";
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export default function ProjectDetailsPage() {
   const params = useParams();
-  const projectId = params.id;
+  const router = useRouter();
+  const projectId = Number(params.id);
+
+  // Project state
+  const [project, setProject] = useState<LenderProject | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
+  const [milestoneStats, setMilestoneStats] = useState<MilestoneStatistics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Refs for each section
   const aboutRef = useRef<HTMLDivElement>(null);
@@ -76,24 +64,15 @@ export default function ProjectDetailsPage() {
   // Active tab state
   const [activeTab, setActiveTab] = useState("about");
 
-  // About section gallery state
-  const aboutGalleryImages = [
-    { id: 1, title: "Front view", src: "/images/house.png" },
-    { id: 2, title: "Side view", src: "/images/house.png" },
-    { id: 3, title: "Interior", src: "/images/house.png" },
-    { id: 4, title: "Kitchen", src: "/images/house.png" },
-    { id: 5, title: "Living room", src: "/images/house.png" },
-    { id: 6, title: "Bedroom", src: "/images/house.png" },
-    { id: 7, title: "Bathroom", src: "/images/house.png" },
-    { id: 8, title: "Garden", src: "/images/house.png" },
-    { id: 9, title: "Parking", src: "/images/house.png" },
-    { id: 10, title: "Aerial view", src: "/images/house.png" },
-  ];
+  // Gallery state
   const [aboutImageIndex, setAboutImageIndex] = useState(0);
   const [showVRTour, setShowVRTour] = useState(false);
   const [showLiveCamera, setShowLiveCamera] = useState(false);
   const [showLoanProposalModal, setShowLoanProposalModal] = useState(false);
   const [proposalSubmitted, setProposalSubmitted] = useState(false);
+
+  // Progress Gallery state (uses same photos as about section)
+  const [progressImageIndex, setProgressImageIndex] = useState(0);
 
   // Proposal state
   const [proposal, setProposal] = useState<LoanProposal | null>(null);
@@ -102,11 +81,65 @@ export default function ProjectDetailsPage() {
   // Mock lender ID - in real app this would come from auth context
   const MOCK_LENDER_ID = "lender-1";
 
+  // Fetch project data
+  const fetchProject = useCallback(async () => {
+    try {
+      const response = await lenderProjectsService.get(projectId);
+      if (response.data?.success) {
+        setProject(response.data.data);
+      } else {
+        setError("Project not found");
+      }
+    } catch (err) {
+      console.error("Error fetching project:", err);
+      setError("Failed to load project");
+    }
+  }, [projectId]);
+
+  // Fetch documents
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const response = await lenderProjectDocumentsService.list(projectId);
+      if (response.data?.success) {
+        setDocuments(response.data.data.documents || []);
+      }
+    } catch (err) {
+      console.error("Error fetching documents:", err);
+    }
+  }, [projectId]);
+
+  // Fetch milestones
+  const fetchMilestones = useCallback(async () => {
+    try {
+      const response = await lenderMilestonesService.list(projectId);
+      if (response.data?.success) {
+        setMilestones(response.data.data.milestones || []);
+        setMilestoneStats(response.data.data.statistics || null);
+      }
+    } catch (err) {
+      console.error("Error fetching milestones:", err);
+    }
+  }, [projectId]);
+
+  // Load all data on mount
+  // Note: Photos are now included inline with project data
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      await Promise.all([fetchProject(), fetchDocuments(), fetchMilestones()]);
+      setIsLoading(false);
+    };
+    if (projectId) {
+      loadData();
+    }
+  }, [projectId, fetchProject, fetchDocuments, fetchMilestones]);
+
   // Fetch existing proposal on page load
   const fetchProposal = useCallback(async () => {
+    if (!projectId) return;
     setIsLoadingProposal(true);
     try {
-      const result = await loanProposalsService.getByProjectAndLender(projectData.id, MOCK_LENDER_ID);
+      const result = await loanProposalsService.getByProjectAndLender(projectId.toString(), MOCK_LENDER_ID);
       if (result?.success && result.data) {
         setProposal(result.data);
         setProposalSubmitted(true);
@@ -116,11 +149,25 @@ export default function ProjectDetailsPage() {
     } finally {
       setIsLoadingProposal(false);
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     fetchProposal();
   }, [fetchProposal]);
+
+  // Gallery images from project's inline photos or fallback
+  const projectPhotos = project?.photos || [];
+  const aboutGalleryImages = projectPhotos.length > 0
+    ? projectPhotos.map((photo) => ({
+        id: photo.id,
+        title: photo.title || "Project image",
+        src: photo.file_url,
+      }))
+    : [
+        { id: 1, title: "Front view", src: "/images/house.png" },
+        { id: 2, title: "Side view", src: "/images/house.png" },
+        { id: 3, title: "Interior", src: "/images/house.png" },
+      ];
 
   const nextAboutImage = () => {
     setAboutImageIndex((prev) => (prev + 1) % aboutGalleryImages.length);
@@ -130,37 +177,20 @@ export default function ProjectDetailsPage() {
     setAboutImageIndex((prev) => (prev - 1 + aboutGalleryImages.length) % aboutGalleryImages.length);
   };
 
-  // Progress Gallery state
-  const progressGalleryImages = [
-    { id: 1, title: "Foundation work", src: "/images/house.png", phase: "Building phase", month: "January" },
-    { id: 2, title: "Frame construction", src: "/images/house.png", phase: "Building phase", month: "February" },
-    { id: 3, title: "Roof installation", src: "/images/house.png", phase: "Building phase", month: "March" },
-    { id: 4, title: "Window fitting", src: "/images/house.png", phase: "Building phase", month: "April" },
-    { id: 5, title: "Interior walls", src: "/images/house.png", phase: "Finishing phase", month: "May" },
-    { id: 6, title: "Electrical work", src: "/images/house.png", phase: "Finishing phase", month: "June" },
-    { id: 7, title: "Plumbing", src: "/images/house.png", phase: "Finishing phase", month: "July" },
-    { id: 8, title: "Painting", src: "/images/house.png", phase: "Finishing phase", month: "August" },
-  ];
-  const [progressImageIndex, setProgressImageIndex] = useState(0);
-  const [selectedPhase, setSelectedPhase] = useState("Building phase");
-  const [selectedMonth, setSelectedMonth] = useState("January");
-
-  const phases = ["Building phase", "Finishing phase"];
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August"];
-
   const nextProgressImage = () => {
-    setProgressImageIndex((prev) => (prev + 1) % progressGalleryImages.length);
+    setProgressImageIndex((prev) => (prev + 1) % aboutGalleryImages.length);
   };
 
   const prevProgressImage = () => {
-    setProgressImageIndex((prev) => (prev - 1 + progressGalleryImages.length) % progressGalleryImages.length);
+    setProgressImageIndex((prev) => (prev - 1 + aboutGalleryImages.length) % aboutGalleryImages.length);
   };
 
   const handleLoanProposalSubmit = async (data: LoanProposalFormData) => {
+    if (!project) return;
     try {
       const response = await loanProposalsService.create(
         {
-          projectId: projectData.id,
+          projectId: project.id.toString(),
           amountOffered: parseFloat(data.amountOffered),
           currency: data.currency,
           interestRate: parseFloat(data.interestRate),
@@ -172,7 +202,7 @@ export default function ProjectDetailsPage() {
         },
         MOCK_LENDER_ID,
         "First National Bank",
-        data.documents // Pass uploaded documents
+        data.documents
       );
 
       if (response.success) {
@@ -201,14 +231,53 @@ export default function ProjectDetailsPage() {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-[#E86A33]" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !project) {
+    return (
+      <div className="space-y-6 max-w-5xl mx-auto">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/marketplace"
+            className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-gray-600" />
+          </Link>
+          <h1 className="text-xl font-semibold">Project Details</h1>
+        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
+          <Building2 className="h-12 w-12 text-red-300 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error || "Project not found"}</p>
+          <Button onClick={() => router.push("/dashboard/marketplace")} variant="outline">
+            Back to Marketplace
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Derived values from project
+  const location = [project.city, project.country].filter(Boolean).join(", ") || "Location not set";
+  const fullAddress = [project.address, project.city, project.country].filter(Boolean).join(", ") || location;
+  const developmentValue = Math.round(project.loan_amount * 1.25); // Estimate
+  const heroImage = project.cover_photo_url || (project.photos?.[0]?.file_url) || "/images/house.png";
+
   return (
     <div className="w-full">
       <div className="space-y-6 max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3">
           <Link
-              href="/dashboard/marketplace"
-              className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors"
+            href="/dashboard/marketplace"
+            className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors"
           >
             <ArrowLeft className="h-4 w-4 text-gray-600" />
           </Link>
@@ -221,17 +290,18 @@ export default function ProjectDetailsPage() {
             {/* Main Image */}
             <div className="relative aspect-[16/9] w-full bg-gray-100">
               <Image
-                  src="/images/house.png"
-                  alt="Project main image"
-                  fill
-                  className="object-cover"
+                src={heroImage}
+                alt={project.title}
+                fill
+                className="object-cover"
+                unoptimized
               />
             </div>
 
             {/* Overlay Title at Bottom */}
             <div className="absolute bottom-0 left-0 right-0 bg-gray-200 p-2">
-              <h2 className="text-base font-bold ">
-                {projectData.name} | {projectData.projectId} | {projectData.location}
+              <h2 className="text-base font-bold">
+                {project.title} | {project.uuid?.slice(0, 8).toUpperCase() || `PRJ-${project.id}`} | {location}
               </h2>
             </div>
           </div>
@@ -244,7 +314,7 @@ export default function ProjectDetailsPage() {
               </div>
               <div>
                 <p className="text-xs text-gray-500">Construction Start</p>
-                <p className="text-sm font-medium">{projectData.constructionStart}</p>
+                <p className="text-sm font-medium">{formatDate(project.construction_start_date)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -253,16 +323,7 @@ export default function ProjectDetailsPage() {
               </div>
               <div>
                 <p className="text-xs text-gray-500">Construction Finish</p>
-                <p className="text-sm font-medium">{projectData.constructionFinish}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100">
-                <CalendarCheck className="h-4 w-4 text-gray-500" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Loan Maturity</p>
-                <p className="text-sm font-medium">{projectData.loanMaturity}</p>
+                <p className="text-sm font-medium">{formatDate(project.construction_end_date)}</p>
               </div>
             </div>
           </div>
@@ -272,21 +333,17 @@ export default function ProjectDetailsPage() {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               {/* Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                {/*<div>*/}
+                {/*  <p className="text-xs text-gray-500 mb-1">Development Value</p>*/}
+                {/*  <p className="text-lg font-bold">${developmentValue.toLocaleString()}</p>*/}
+                {/*</div>*/}
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Development Value</p>
-                  <p className="text-lg font-bold">${projectData.developmentValue.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 mb-1">Loan Amount</p>
+                  <p className="text-lg font-bold text-[#E86A33]">${project.loan_amount.toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Loan Value</p>
-                  <p className="text-lg font-bold text-[#E86A33]">${projectData.loanValue.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">LTV</p>
-                  <p className="text-lg font-bold">{projectData.ltv}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Loan Type</p>
-                  <p className="text-lg font-bold">{projectData.loanType}</p>
+                  <p className="text-xs text-gray-500 mb-1">Project Type</p>
+                  <p className="text-lg font-bold">{project.project_type_label}</p>
                 </div>
               </div>
 
@@ -327,20 +384,20 @@ export default function ProjectDetailsPage() {
         </div>
 
         {/* Tab Navigation - Sticky */}
-        <div className="flex justify-center sticky top-0  z-10">
+        <div className="flex justify-center sticky top-0 z-10">
           <nav className="flex gap-8">
             {tabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    onClick={() => scrollToSection(tab.id, tab.ref)}
-                    className={`py-4 cursor-pointer text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab.id
-                        ? "text-[#E86A33] border-[#E86A33]"
-                        : "text-gray-500 border-transparent hover:text-[#E86A33] hover:border-[#E86A33]"
-                    }`}
-                >
-                  {tab.label}
-                </button>
+              <button
+                key={tab.id}
+                onClick={() => scrollToSection(tab.id, tab.ref)}
+                className={`py-4 cursor-pointer text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? "text-[#E86A33] border-[#E86A33]"
+                    : "text-gray-500 border-transparent hover:text-[#E86A33] hover:border-[#E86A33]"
+                }`}
+              >
+                {tab.label}
+              </button>
             ))}
           </nav>
         </div>
@@ -349,55 +406,62 @@ export default function ProjectDetailsPage() {
       {/* All Sections */}
       <div className="space-y-12 max-w-5xl mx-auto p-4">
         {/* About Project Section */}
-        <div ref={aboutRef} className="scroll-mt-20 ">
+        <div ref={aboutRef} className="scroll-mt-20">
           <h3 className="text-lg font-semibold mb-6">About project</h3>
-          <div className="rounded-xl  bg-white grid grid-cols-1 lg:grid-cols-2 ">
+          <div className="rounded-xl bg-white grid grid-cols-1 lg:grid-cols-2">
             {/* Left - Image Carousel */}
-            <div className="space-y-3 ">
+            <div className="space-y-3">
               {/* Main Image with Navigation */}
-              <div className="relative aspect-[4/3] w-full overflow-hidden ">
+              <div className="relative aspect-[4/3] w-full overflow-hidden">
                 <Image
-                  src={aboutGalleryImages[aboutImageIndex].src}
-                  alt={aboutGalleryImages[aboutImageIndex].title}
+                  src={aboutGalleryImages[aboutImageIndex]?.src || "/images/house.png"}
+                  alt={aboutGalleryImages[aboutImageIndex]?.title || "Project image"}
                   fill
                   className="object-cover"
+                  unoptimized
                 />
 
-                {/* Navigation Arrows */}
-                <button
-                  onClick={prevAboutImage}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-md cursor-pointer"
-                >
-                  <ChevronLeft className="h-5 w-5 text-gray-700" />
-                </button>
-                <button
-                  onClick={nextAboutImage}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-md cursor-pointer"
-                >
-                  <ChevronRight className="h-5 w-5 text-gray-700" />
-                </button>
+                {aboutGalleryImages.length > 1 && (
+                  <>
+                    {/* Navigation Arrows */}
+                    <button
+                      onClick={prevAboutImage}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-md cursor-pointer"
+                    >
+                      <ChevronLeft className="h-5 w-5 text-gray-700" />
+                    </button>
+                    <button
+                      onClick={nextAboutImage}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-md cursor-pointer"
+                    >
+                      <ChevronRight className="h-5 w-5 text-gray-700" />
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Picture Title & Pagination */}
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600 p-2">{aboutGalleryImages[aboutImageIndex].title}</p>
+                <p className="text-sm text-gray-600 p-2">{aboutGalleryImages[aboutImageIndex]?.title}</p>
                 <div className="flex items-center gap-2">
                   {/* Pagination dots */}
-                  <div className="flex items-center gap-1">
-                    {aboutGalleryImages.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setAboutImageIndex(index)}
-                        className={`w-2 h-2 rounded-full transition-colors ${
-                          index === aboutImageIndex ? "bg-gray-800" : "bg-gray-300"
-                        }`}
-                      />
-                    ))}
-                  </div>
+                  {aboutGalleryImages.length > 1 && (
+                    <div className="flex items-center gap-1">
+                      {aboutGalleryImages.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setAboutImageIndex(index)}
+                          className={`w-2 h-2 rounded-full transition-colors ${
+                            index === aboutImageIndex ? "bg-gray-800" : "bg-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
                   {/* Fullscreen button */}
-                  <button className="ml-2 p-1 hover:bg-gray-200 rounded transition-colors">
-                    <Maximize2 className="h-4 w-4 text-gray-500" />
-                  </button>
+                  {/*<button className="ml-2 p-1 hover:bg-gray-200 rounded transition-colors">*/}
+                  {/*  <Maximize2 className="h-4 w-4 text-gray-500" />*/}
+                  {/*</button>*/}
                 </div>
               </div>
             </div>
@@ -406,12 +470,33 @@ export default function ProjectDetailsPage() {
             <div className="space-y-4 p-4">
               <h4 className="text-lg font-semibold">About project</h4>
               <div className="text-sm text-gray-600 leading-relaxed">
-                <p className="mb-4">
-                  Our investment features four semi-detached houses. Each house offers a modern and functional living space that seamlessly blends style and comfort. With high-quality materials and attention to detail, these homes are not only beautiful but also built to last.
-                </p>
-                <p>
-                  The investment is located in a prime location, with easy access to amenities and transportation, making it an ideal choice for families.
-                </p>
+                {project.description ? (
+                  <p className="whitespace-pre-wrap">{project.description}</p>
+                ) : (
+                  <p>No description available for this project.</p>
+                )}
+              </div>
+
+              {/* Project Details */}
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                <div>
+                  <p className="text-xs text-gray-500">Project Type</p>
+                  <p className="text-sm font-medium capitalize">{project.project_type_label || project.project_type.replace("_", " ")}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Min Investment</p>
+                  <p className="text-sm font-medium">${Number(project.min_investment).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Currency</p>
+                  <p className="text-sm font-medium">{project.currency}</p>
+                </div>
+                {project.amount_raised !== undefined && (
+                  <div>
+                    <p className="text-xs text-gray-500">Amount Raised</p>
+                    <p className="text-sm font-medium text-green-600">${project.amount_raised.toLocaleString()}</p>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -450,11 +535,11 @@ export default function ProjectDetailsPage() {
               {/* Team Member Info */}
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <h4 className="font-semibold">{projectData.team.name}</h4>
-                  <span className="text-sm text-gray-500">| {projectData.team.role}</span>
+                  <h4 className="font-semibold">{hardcodedData.team.name}</h4>
+                  <span className="text-sm text-gray-500">| {hardcodedData.team.role}</span>
                 </div>
                 <p className="text-sm text-gray-600 leading-relaxed">
-                  {projectData.team.bio}
+                  {hardcodedData.team.bio}
                 </p>
               </div>
             </div>
@@ -463,74 +548,51 @@ export default function ProjectDetailsPage() {
 
         {/* Progress Gallery Section */}
         <div ref={galleryRef} className="scroll-mt-20">
-          {/* Header with filters */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Progress gallery</h3>
-            <div className="flex gap-3">
-              {/* Phase Dropdown */}
-              <select
-                value={selectedPhase}
-                onChange={(e) => setSelectedPhase(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#E86A33] cursor-pointer"
-              >
-                {phases.map((phase) => (
-                  <option key={phase} value={phase}>{phase}</option>
-                ))}
-              </select>
-              {/* Month Dropdown */}
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#E86A33] cursor-pointer"
-              >
-                {months.map((month) => (
-                  <option key={month} value={month}>{month}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <h3 className="text-lg font-semibold mb-4">Project gallery</h3>
 
           {/* Gallery Container */}
           <div className="rounded-xl bg-white overflow-hidden">
             {/* Main Image with Navigation */}
             <div className="relative aspect-[16/9] w-full bg-gray-100">
               <Image
-                src={progressGalleryImages[progressImageIndex].src}
-                alt={progressGalleryImages[progressImageIndex].title}
+                src={aboutGalleryImages[progressImageIndex]?.src || "/images/house.png"}
+                alt={aboutGalleryImages[progressImageIndex]?.title || "Project image"}
                 fill
                 className="object-cover"
+                unoptimized
               />
 
-              {/* Navigation Arrows */}
-              <button
-                onClick={prevProgressImage}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-md cursor-pointer"
-              >
-                <ChevronLeft className="h-6 w-6 text-gray-700" />
-              </button>
-              <button
-                onClick={nextProgressImage}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-md cursor-pointer"
-              >
-                <ChevronRight className="h-6 w-6 text-gray-700" />
-              </button>
+              {aboutGalleryImages.length > 1 && (
+                <>
+                  {/* Navigation Arrows */}
+                  <button
+                    onClick={prevProgressImage}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-md cursor-pointer"
+                  >
+                    <ChevronLeft className="h-6 w-6 text-gray-700" />
+                  </button>
+                  <button
+                    onClick={nextProgressImage}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-md cursor-pointer"
+                  >
+                    <ChevronRight className="h-6 w-6 text-gray-700" />
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Bottom Bar - Title & Pagination */}
             <div className="flex items-center justify-between p-3 border-t border-gray-100">
               {/* Picture Title */}
               <p className="text-sm text-gray-600">
-                {progressGalleryImages[progressImageIndex].title}
+                {aboutGalleryImages[progressImageIndex]?.title}
               </p>
 
-              {/* Pagination & Fullscreen */}
+              {/* Pagination */}
               <div className="flex items-center gap-3">
                 <span className="text-sm text-gray-500">
-                  {progressImageIndex + 1}/{progressGalleryImages.length}
+                  {progressImageIndex + 1}/{aboutGalleryImages.length}
                 </span>
-                <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                  <Maximize2 className="h-4 w-4 text-gray-500" />
-                </button>
               </div>
             </div>
           </div>
@@ -543,7 +605,7 @@ export default function ProjectDetailsPage() {
             {/* Address */}
             <div className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-[#E86A33]" />
-              <p className="text-sm font-medium">{projectData.locationDetails.address}</p>
+              <p className="text-sm font-medium">{fullAddress}</p>
             </div>
 
             {/* Two Maps Side by Side */}
@@ -555,7 +617,7 @@ export default function ProjectDetailsPage() {
                   loading="lazy"
                   allowFullScreen
                   referrerPolicy="no-referrer-when-downgrade"
-                  src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(projectData.locationDetails.address)}&zoom=16`}
+                  src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(fullAddress)}&zoom=16`}
                 />
               </div>
 
@@ -573,12 +635,12 @@ export default function ProjectDetailsPage() {
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               {/* Description */}
               <p className="text-sm text-gray-600 leading-relaxed max-w-2xl">
-                Wrocław, the enchanting city of a hundred bridges, captivates visitors with its breathtaking architecture, vibrant culture, and picturesque waterways. With its friendly and welcoming atmosphere, this Polish gem promises a memorable and inspiring experience for all who come to explore its charming streets and rich history.
+                {hardcodedData.locationDescription}
               </p>
 
               {/* About location button */}
               <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(projectData.locationDetails.address)}`}
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-shrink-0"
@@ -596,27 +658,103 @@ export default function ProjectDetailsPage() {
         <div ref={documentsRef} className="scroll-mt-20">
           <h3 className="text-lg font-semibold mb-4">Documentation</h3>
           <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <h4 className="text-sm font-medium text-gray-700 mb-4">Required documents</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {projectData.documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors"
-                >
-                  {doc.checked ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  ) : (
-                    <Circle className="h-5 w-5 text-gray-300 flex-shrink-0" />
-                  )}
-                  <div className="flex items-center gap-2 flex-1">
-                    <FileText className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm">{doc.name}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <h4 className="text-sm font-medium text-gray-700 mb-4">Project documents</h4>
+            {documents.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {documents.map((doc) => (
+                  <a
+                    key={doc.id}
+                    href={doc.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors"
+                  >
+                    {doc.verification_status === "approved" ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-gray-300 flex-shrink-0" />
+                    )}
+                    <div className="flex items-center gap-2 flex-1">
+                      <FileText className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm">{doc.title}</span>
+                    </div>
+                    <Download className="h-4 w-4 text-gray-400" />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <FileText className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm">No documents available for this project yet.</p>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Milestones Section (if available) */}
+        {milestones.length > 0 && (
+          <div className="scroll-mt-20">
+            <h3 className="text-lg font-semibold mb-4">Project Milestones</h3>
+            <div className="rounded-xl border bg-white p-6 shadow-sm">
+              {/* Milestone Stats */}
+              {milestoneStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="text-xs text-gray-500">Total Milestones</p>
+                    <p className="text-lg font-semibold">{milestoneStats.total_milestones}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Completed</p>
+                    <p className="text-lg font-semibold text-green-600">{milestoneStats.completed_milestones}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Progress</p>
+                    <p className="text-lg font-semibold">{milestoneStats.progress_percentage}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Paid Amount</p>
+                    <p className="text-lg font-semibold text-green-600">${milestoneStats.paid_amount.toLocaleString()}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {milestones.map((milestone, index) => (
+                  <div
+                    key={milestone.id}
+                    className="flex items-start gap-4 p-4 rounded-lg border border-gray-100"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#E86A33]/10 flex items-center justify-center text-[#E86A33] font-semibold text-sm">
+                      {milestone.sequence || index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <h4 className="font-medium">{milestone.title}</h4>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          milestone.status === "paid" ? "bg-green-100 text-green-700" :
+                          milestone.status === "approved" ? "bg-blue-100 text-blue-700" :
+                          milestone.status === "proof_submitted" ? "bg-amber-100 text-amber-700" :
+                          "bg-gray-100 text-gray-700"
+                        }`}>
+                          {milestone.status_label}
+                        </span>
+                      </div>
+                      {milestone.description && (
+                        <p className="text-sm text-gray-600 mb-2">{milestone.description}</p>
+                      )}
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span>${milestone.amount.toLocaleString()} ({milestone.percentage}%)</span>
+                        {milestone.due_date && (
+                          <span>Due: {formatDate(milestone.due_date)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* VR Tour Modal */}
@@ -677,10 +815,10 @@ export default function ProjectDetailsPage() {
       <LoanProposalModal
         open={showLoanProposalModal}
         onOpenChange={setShowLoanProposalModal}
-        projectId={projectData.id}
-        projectName={projectData.name}
-        projectImage="/images/house.png"
-        loanValue={projectData.loanValue}
+        projectId={project.id.toString()}
+        projectName={project.title}
+        projectImage={heroImage}
+        loanValue={project.loan_amount}
         onSubmit={handleLoanProposalSubmit}
       />
     </div>

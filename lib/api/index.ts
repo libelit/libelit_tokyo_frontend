@@ -17,6 +17,13 @@ export {
   projectDocumentsService,
 } from "./developer";
 
-export { lenderProfileService, lenderKybService } from "./lender";
+export {
+  lenderProfileService,
+  lenderKybService,
+  lenderProjectsService,
+  lenderProjectDocumentsService,
+  lenderMilestonesService,
+  lenderProjectPhotosService,
+} from "./lender";
 
 export { loanProposalsService } from "./loan-proposals";

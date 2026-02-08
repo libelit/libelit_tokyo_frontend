@@ -22,11 +22,8 @@ const mockProject = {
   location: "City, Country",
   description:
     "Our investment features four semi-detached houses. Our investment features four semi-detached houses.",
-  price: 312500,
-  downPayment: "12.5%",
-  projectValue: 2500000,
   loanValue: 1000000,
-  loanDuration: 216,
+  projectDuration: 216,
 };
 
 export default function DashboardPage() {
