@@ -5,7 +5,7 @@ import { Upload, File, X, CheckCircle2, AlertCircle, Loader2 } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type LenderDocumentStatus = "not_uploaded" | "uploading" | "uploaded" | "verified" | "rejected";
+export type LenderDocumentStatus = "not_uploaded" | "staged" | "uploading" | "uploaded" | "verified" | "rejected";
 
 interface LenderDocumentUploadCardProps {
   title: string;
@@ -24,6 +24,10 @@ const statusConfig = {
   not_uploaded: {
     borderColor: "border-gray-200",
     bgColor: "bg-white",
+  },
+  staged: {
+    borderColor: "border-orange-200",
+    bgColor: "bg-orange-50",
   },
   uploading: {
     borderColor: "border-blue-200",
@@ -154,6 +158,25 @@ export function LenderDocumentUploadCard({
           <div className="flex-1">
             <p className="text-sm font-medium">Uploading...</p>
           </div>
+        </div>
+      ) : status === "staged" ? (
+        <div className="flex items-center gap-4 p-4 bg-white rounded-lg border border-orange-200">
+          <File className="h-8 w-8 text-[#E86A33]" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{fileName}</p>
+            <p className="text-xs text-orange-600">Ready to upload</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="flex-shrink-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       ) : (
         <div className="flex items-center gap-4 p-4 bg-white rounded-lg border">

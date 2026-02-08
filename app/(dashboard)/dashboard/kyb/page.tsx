@@ -1,49 +1,62 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, Clock, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Clock, AlertCircle, ArrowLeft, Loader2, Eye } from "lucide-react";
 import Link from "next/link";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { LenderDocumentUploadCard, LenderDocumentStatus } from "@/components/dashboard/lender-document-upload-card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { lenderProfileService, lenderKybService } from "@/lib/api";
+import type { LenderProfile, LenderDocument, KybStatus, LenderKybDocumentType } from "@/lib/types/lender";
 
-// Hardcoded KYB status - change this to test different states:
-// "not_started" | "pending" | "under_review" | "approved" | "rejected"
-const HARDCODED_KYB_STATUS = "not_started";
-const HARDCODED_REJECTION_REASON = "Documents were unclear. Please resubmit with better quality images.";
-
-type LenderKybStatus = "not_started" | "pending" | "under_review" | "approved" | "rejected";
-
-interface LenderKybDocument {
-  id: string;
-  type: string;
+interface KybDocument {
+  id: number | null;
+  type: LenderKybDocumentType;
   title: string;
   description: string;
   required: boolean;
   status: LenderDocumentStatus;
   fileName?: string;
+  fileUrl?: string;
   rejectionReason?: string;
 }
 
-// Document configurations for lenders
-const documentConfigs = [
+// Document type configurations for lenders
+const documentConfigs: Array<{
+  type: LenderKybDocumentType;
+  title: string;
+  description: string;
+  required: boolean;
+}> = [
   {
-    type: "government_id",
-    title: "Government-Issued ID",
-    description: "Passport, driver's license, or national ID card",
+    type: "kyb_lender_certificate_of_incorporation",
+    title: "Certificate of Incorporation",
+    description: "Official certificate proving your business is legally registered",
     required: true,
   },
   {
-    type: "proof_of_address",
-    title: "Proof of Address",
-    description: "Utility bill or bank statement (within last 3 months)",
+    type: "kyb_lender_business_license",
+    title: "Business/Financial Services License",
+    description: "Valid license to operate as a financial institution or lender",
     required: true,
   },
   {
-    type: "source_of_funds",
-    title: "Source of Funds Declaration",
-    description: "Document explaining the origin of your investment funds",
+    type: "kyb_lender_beneficial_ownership",
+    title: "Beneficial Ownership Declaration",
+    description: "Declaration of ultimate beneficial owners (UBO) with ownership details",
+    required: true,
+  },
+  {
+    type: "kyb_lender_tax_certificate",
+    title: "Tax Identification Certificate",
+    description: "Tax registration certificate or TIN documentation",
+    required: true,
+  },
+  {
+    type: "kyb_lender_address_proof",
+    title: "Proof of Business Address",
+    description: "Utility bill or official letter showing your business address (within last 3 months)",
     required: true,
   },
 ];
@@ -56,87 +69,256 @@ const statusSteps = [
 ];
 
 export default function LenderKybVerificationPage() {
-  // Hardcoded status - in real implementation this would come from API
-  const [kybStatus] = useState<LenderKybStatus>(HARDCODED_KYB_STATUS);
-
-  // Initialize documents with hardcoded initial state
-  const [documents, setDocuments] = useState<LenderKybDocument[]>(
-    documentConfigs.map((config) => ({
-      id: config.type,
-      type: config.type,
-      title: config.title,
-      description: config.description,
-      required: config.required,
-      status: "not_uploaded" as LenderDocumentStatus,
-    }))
-  );
-
+  const [profile, setProfile] = useState<LenderProfile | null>(null);
+  const [documents, setDocuments] = useState<KybDocument[]>([]);
+  const [stagedFiles, setStagedFiles] = useState<Map<LenderKybDocumentType, File>>(new Map());
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch profile and documents
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  async function fetchData() {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Fetch profile
+      const profileResponse = await lenderProfileService.getProfile();
+      if (profileResponse.error) {
+        setError(profileResponse.error);
+        return;
+      }
+      if (profileResponse.data?.data) {
+        setProfile(profileResponse.data.data);
+      }
+
+      // Fetch KYB documents
+      const docsResponse = await lenderKybService.getDocuments();
+      if (docsResponse.data?.data) {
+        const uploadedDocs = docsResponse.data.data;
+
+        // Map document configs with uploaded documents
+        const mappedDocs = documentConfigs.map((config) => {
+          const uploadedDoc = uploadedDocs.find(
+            (d: LenderDocument) => d.document_type === config.type
+          );
+
+          if (uploadedDoc) {
+            return {
+              id: uploadedDoc.id,
+              type: config.type,
+              title: config.title,
+              description: config.description,
+              required: config.required,
+              status: mapVerificationStatus(uploadedDoc.verification_status),
+              fileName: uploadedDoc.file_name,
+              fileUrl: uploadedDoc.file_url,
+              rejectionReason: uploadedDoc.rejection_reason || undefined,
+            };
+          }
+
+          return {
+            id: null,
+            type: config.type,
+            title: config.title,
+            description: config.description,
+            required: config.required,
+            status: "not_uploaded" as LenderDocumentStatus,
+          };
+        });
+
+        setDocuments(mappedDocs);
+      } else {
+        // Initialize with empty documents if no documents fetched
+        setDocuments(
+          documentConfigs.map((config) => ({
+            id: null,
+            type: config.type,
+            title: config.title,
+            description: config.description,
+            required: config.required,
+            status: "not_uploaded" as LenderDocumentStatus,
+          }))
+        );
+      }
+    } catch (err) {
+      setError("Failed to load KYB data");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function mapVerificationStatus(status: string): LenderDocumentStatus {
+    switch (status) {
+      case "approved":
+        return "verified";
+      case "rejected":
+        return "rejected";
+      default:
+        return "uploaded";
+    }
+  }
+
+  // Count documents that are either uploaded to server or staged locally
   const uploadedCount = documents.filter(
     (d) => d.status === "uploaded" || d.status === "verified"
   ).length;
+  const stagedCount = stagedFiles.size;
+  const readyCount = uploadedCount + stagedCount;
+
   const requiredCount = documents.filter((d) => d.required).length;
-  const allRequiredUploaded = documents
+  const allRequiredReady = documents
     .filter((d) => d.required)
-    .every((d) => d.status === "uploaded" || d.status === "verified");
-  const progressPercentage = documents.length > 0 ? (uploadedCount / documents.length) * 100 : 0;
+    .every((d) => d.status === "uploaded" || d.status === "verified" || stagedFiles.has(d.type));
+  const progressPercentage = documents.length > 0 ? (readyCount / documents.length) * 100 : 0;
 
-  const handleUpload = (docType: string, file: File) => {
-    // Simulate upload - in real implementation this would call an API
-    setDocuments((prev) =>
-      prev.map((d) =>
-        d.type === docType
-          ? { ...d, status: "uploading" as LenderDocumentStatus }
-          : d
-      )
-    );
+  // Determine effective KYB status based on both profile status AND actual documents
+  // If profile says pending/under_review but no documents exist, treat as not_started
+  const profileKybStatus = profile?.kyb_status || "not_started";
+  const hasUploadedDocuments = uploadedCount > 0;
 
-    // Simulate upload delay
-    setTimeout(() => {
+  const kybStatus: KybStatus =
+    (profileKybStatus === "pending" || profileKybStatus === "under_review") && !hasUploadedDocuments
+      ? "not_started"
+      : profileKybStatus;
+
+  // Get document status including staged files
+  const getDocumentStatus = (doc: KybDocument): LenderDocumentStatus => {
+    if (stagedFiles.has(doc.type)) {
+      return "staged";
+    }
+    return doc.status;
+  };
+
+  // Get file name for display (staged or uploaded)
+  const getFileName = (doc: KybDocument): string | undefined => {
+    const stagedFile = stagedFiles.get(doc.type);
+    if (stagedFile) {
+      return stagedFile.name;
+    }
+    return doc.fileName;
+  };
+
+  // Stage file locally instead of uploading immediately
+  const handleUpload = (docType: LenderKybDocumentType, file: File) => {
+    setStagedFiles((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(docType, file);
+      return newMap;
+    });
+  };
+
+  // Remove file - either from staged files or from server
+  const handleRemove = async (docType: LenderKybDocumentType) => {
+    // Check if it's a staged file
+    if (stagedFiles.has(docType)) {
+      setStagedFiles((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(docType);
+        return newMap;
+      });
+      return;
+    }
+
+    // Otherwise, delete from server
+    const doc = documents.find((d) => d.type === docType);
+    if (!doc?.id) return;
+
+    try {
+      const response = await lenderKybService.deleteDocument(doc.id);
+
+      if (response.error) {
+        setError(response.error);
+        return;
+      }
+
       setDocuments((prev) =>
         prev.map((d) =>
           d.type === docType
-            ? {
-                ...d,
-                status: "uploaded" as LenderDocumentStatus,
-                fileName: file.name,
-              }
+            ? { ...d, id: null, status: "not_uploaded" as LenderDocumentStatus, fileName: undefined }
             : d
         )
       );
-    }, 1500);
+    } catch (err) {
+      setError("Failed to delete document");
+    }
   };
 
-  const handleRemove = (docType: string) => {
-    setDocuments((prev) =>
-      prev.map((d) =>
-        d.type === docType
-          ? { ...d, status: "not_uploaded" as LenderDocumentStatus, fileName: undefined }
-          : d
-      )
-    );
-  };
-
-  const handleSubmit = () => {
-    if (!allRequiredUploaded) return;
+  const handleSubmit = async () => {
+    if (!allRequiredReady) return;
 
     setIsSubmitting(true);
     setError(null);
 
-    // Simulate submission - in real implementation this would call an API
-    setTimeout(() => {
+    try {
+      // Step 1: Upload all staged documents in a single batch request
+      if (stagedFiles.size > 0) {
+        const documentsToUpload = Array.from(stagedFiles.entries()).map(([docType, file]) => {
+          const config = documentConfigs.find((c) => c.type === docType);
+          return {
+            document_type: docType,
+            title: config?.title || docType,
+            file,
+          };
+        });
+
+        const uploadResponse = await lenderKybService.uploadDocuments({
+          documents: documentsToUpload,
+        });
+
+        if (uploadResponse.error) {
+          setError(uploadResponse.error);
+          return;
+        }
+
+        // Clear staged files after successful upload
+        setStagedFiles(new Map());
+      }
+
+      // Step 2: Submit KYB for review
+      const response = await lenderKybService.submit();
+
+      if (response.error) {
+        setError(response.error);
+        return;
+      }
+
+      if (response.data?.success) {
+        // Refresh data to get updated status
+        await fetchData();
+      } else if (response.data?.missing_documents) {
+        setError(
+          `Missing documents: ${response.data.missing_documents
+            .map((d) => d.label)
+            .join(", ")}`
+        );
+      }
+    } catch (err) {
+      setError("Failed to submit KYB");
+    } finally {
       setIsSubmitting(false);
-      // For now, just show a message since this is hardcoded
-      alert("Documents submitted successfully! (This is a demo - in production, the status would update to 'pending')");
-    }, 2000);
+    }
   };
 
   const getCurrentStepIndex = () => {
     const index = statusSteps.findIndex((s) => s.key === kybStatus);
     return index >= 0 ? index : 0;
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <DashboardHeader title="KYB Verification" />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-[#E86A33]" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -170,7 +352,7 @@ export default function LenderKybVerificationPage() {
           <div>
             <h2 className="text-lg font-semibold">Verification Status</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Complete your identity verification to start investing in projects
+              Complete your business verification to start investing in projects
             </p>
           </div>
           {kybStatus === "approved" && (
@@ -200,10 +382,10 @@ export default function LenderKybVerificationPage() {
         </div>
 
         {/* Rejection Reason */}
-        {kybStatus === "rejected" && (
+        {kybStatus === "rejected" && profile?.kyb_rejection_reason && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-700">
-              <strong>Rejection Reason:</strong> {HARDCODED_REJECTION_REASON}
+              <strong>Rejection Reason:</strong> {profile.kyb_rejection_reason}
             </p>
           </div>
         )}
@@ -269,14 +451,14 @@ export default function LenderKybVerificationPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Upload Documents</h2>
               <span className="text-sm text-gray-500">
-                {uploadedCount} of {documents.length} uploaded
+                {readyCount} of {documents.length} ready
               </span>
             </div>
             <Progress value={progressPercentage} className="h-2" />
             <p className="text-sm text-gray-500 mt-2">
-              {allRequiredUploaded
-                ? "All required documents uploaded. You can now submit for verification."
-                : `Upload all required documents (${requiredCount - uploadedCount} remaining) to submit for verification.`}
+              {allRequiredReady
+                ? "All required documents ready. Click submit to upload and verify."
+                : `Select all required documents (${requiredCount - readyCount} remaining) to submit for verification.`}
             </p>
           </div>
 
@@ -288,8 +470,8 @@ export default function LenderKybVerificationPage() {
                 title={doc.title}
                 description={doc.description}
                 required={doc.required}
-                status={doc.status}
-                fileName={doc.fileName}
+                status={getDocumentStatus(doc)}
+                fileName={getFileName(doc)}
                 rejectionReason={doc.rejectionReason}
                 onUpload={(file) => handleUpload(doc.type, file)}
                 onRemove={() => handleRemove(doc.type)}
@@ -301,13 +483,13 @@ export default function LenderKybVerificationPage() {
           <div className="flex justify-end">
             <Button
               onClick={handleSubmit}
-              disabled={!allRequiredUploaded || isSubmitting}
+              disabled={!allRequiredReady || isSubmitting}
               className="bg-[#E86A33] hover:bg-[#d55a25] disabled:bg-gray-300"
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting...
+                  {stagedFiles.size > 0 ? "Uploading & Submitting..." : "Submitting..."}
                 </>
               ) : (
                 "Submit for Verification"
@@ -340,10 +522,10 @@ export default function LenderKybVerificationPage() {
         <div className="rounded-xl border bg-green-50 border-green-200 p-8 shadow-sm text-center">
           <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2 text-green-800">
-            Identity Verified
+            Business Verified
           </h2>
           <p className="text-green-700 max-w-md mx-auto mb-6">
-            Congratulations! Your identity has been verified. You can now start investing in projects.
+            Congratulations! Your business has been verified. You can now start investing in projects.
           </p>
           <Link href="/dashboard/marketplace">
             <Button className="bg-[#E86A33] hover:bg-[#d55a25]">
@@ -373,24 +555,37 @@ export default function LenderKybVerificationPage() {
                   )}
                   <div>
                     <p className="font-medium">{doc.title}</p>
-                    <p className="text-sm text-gray-500">{doc.fileName || "document.pdf"}</p>
+                    <p className="text-sm text-gray-500">{doc.fileName}</p>
                   </div>
                 </div>
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    doc.status === "verified"
-                      ? "bg-green-100 text-green-700"
+                <div className="flex items-center gap-3">
+                  {doc.fileUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(doc.fileUrl, "_blank")}
+                      className="flex items-center gap-1"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View
+                    </Button>
+                  )}
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      doc.status === "verified"
+                        ? "bg-green-100 text-green-700"
+                        : doc.status === "rejected"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {doc.status === "verified"
+                      ? "Verified"
                       : doc.status === "rejected"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {doc.status === "verified"
-                    ? "Verified"
-                    : doc.status === "rejected"
-                    ? "Rejected"
-                    : "Pending"}
-                </span>
+                      ? "Rejected"
+                      : "Pending"}
+                  </span>
+                </div>
               </div>
             ))}
           </div>

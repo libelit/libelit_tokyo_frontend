@@ -5,9 +5,12 @@ import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { ProjectCard, Project } from "@/components/dashboard/project-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, AlertCircle, Loader2 } from "lucide-react";
 import { loanProposalsService } from "@/lib/api/loan-proposals";
+import { lenderProfileService } from "@/lib/api";
 import { ProposalStatus } from "@/lib/types/loan-proposal";
+import type { LenderProfile, KybStatus } from "@/lib/types/lender";
+import Link from "next/link";
 
 // Mock lender ID - in real app this would come from auth context
 const MOCK_LENDER_ID = "lender-1";
@@ -88,9 +91,90 @@ const mockProjects: Project[] = [
   },
 ];
 
+function KybBlockedMessage({ kybStatus }: { kybStatus: KybStatus }) {
+  const getMessage = () => {
+    switch (kybStatus) {
+      case "not_started":
+        return {
+          title: "Complete KYB Verification",
+          description: "You need to complete your business verification before you can browse and invest in projects.",
+          buttonText: "Start Verification",
+        };
+      case "pending":
+        return {
+          title: "KYB Verification Pending",
+          description: "Your documents have been submitted and are awaiting review. You'll be able to access the marketplace once verified.",
+          buttonText: "View Status",
+        };
+      case "under_review":
+        return {
+          title: "KYB Under Review",
+          description: "Our team is currently reviewing your documents. This usually takes 1-2 business days.",
+          buttonText: "View Status",
+        };
+      case "rejected":
+        return {
+          title: "KYB Verification Rejected",
+          description: "Your verification was rejected. Please review the feedback and resubmit your documents.",
+          buttonText: "Resubmit Documents",
+        };
+      default:
+        return {
+          title: "Verification Required",
+          description: "Please complete your business verification to access the marketplace.",
+          buttonText: "Start Verification",
+        };
+    }
+  };
+
+  const message = getMessage();
+
+  return (
+    <div className="space-y-6">
+      <DashboardHeader title="Marketplace" subtitle="Browse investment opportunities" />
+
+      <div className="rounded-xl border bg-white p-8 shadow-sm text-center max-w-lg mx-auto mt-12">
+        <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="h-8 w-8 text-[#E86A33]" />
+        </div>
+        <h2 className="text-xl font-semibold mb-2">{message.title}</h2>
+        <p className="text-gray-500 mb-6">{message.description}</p>
+        <Link href="/dashboard/kyb">
+          <Button className="bg-[#E86A33] hover:bg-[#d55a25]">
+            {message.buttonText}
+          </Button>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [proposalStatuses, setProposalStatuses] = useState<Record<string, ProposalStatus>>({});
+  const [profile, setProfile] = useState<LenderProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch lender profile to check KYB status
+  useEffect(() => {
+    async function fetchProfile() {
+      setIsLoading(true);
+      try {
+        const response = await lenderProfileService.getProfile();
+        if (response.data?.data) {
+          setProfile(response.data.data);
+        } else if (response.error) {
+          setError(response.error);
+        }
+      } catch (err) {
+        setError("Failed to load profile");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchProfile();
+  }, []);
 
   // Fetch proposal statuses for all projects
   const fetchProposalStatuses = useCallback(async () => {
@@ -109,8 +193,10 @@ export default function MarketplacePage() {
   }, []);
 
   useEffect(() => {
-    fetchProposalStatuses();
-  }, [fetchProposalStatuses]);
+    if (profile?.kyb_status === "approved") {
+      fetchProposalStatuses();
+    }
+  }, [fetchProposalStatuses, profile?.kyb_status]);
 
   // Filter projects based on search query
   const filteredProjects = mockProjects.filter(
@@ -120,6 +206,37 @@ export default function MarketplacePage() {
       project.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <DashboardHeader title="Marketplace" subtitle="Browse investment opportunities" />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-[#E86A33]" />
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <DashboardHeader title="Marketplace" subtitle="Browse investment opportunities" />
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // KYB not approved - show blocked message
+  const kybStatus = profile?.kyb_status || "not_started";
+  if (kybStatus !== "approved") {
+    return <KybBlockedMessage kybStatus={kybStatus} />;
+  }
+
+  // KYB approved - show marketplace
   return (
     <div className="space-y-6">
       <DashboardHeader title="Marketplace" subtitle="Browse investment opportunities" />

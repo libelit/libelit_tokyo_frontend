@@ -17,4 +17,6 @@ export {
   projectDocumentsService,
 } from "./developer";
 
+export { lenderProfileService, lenderKybService } from "./lender";
+
 export { loanProposalsService } from "./loan-proposals";
