@@ -177,12 +177,17 @@ export default function LenderKybVerificationPage() {
   const progressPercentage = documents.length > 0 ? (readyCount / documents.length) * 100 : 0;
 
   // Determine effective KYB status based on both profile status AND actual documents
-  // If profile says pending/under_review but no documents exist, treat as not_started
   const profileKybStatus = profile?.kyb_status || "not_started";
   const hasUploadedDocuments = uploadedCount > 0;
 
+  // If admin has approved, always trust the approved status
+  // If profile says pending/under_review but no documents exist, treat as not_started
   const kybStatus: KybStatus =
-    (profileKybStatus === "pending" || profileKybStatus === "under_review") && !hasUploadedDocuments
+    profileKybStatus === "approved"
+      ? "approved"
+      : profileKybStatus === "rejected"
+      ? "rejected"
+      : (profileKybStatus === "pending" || profileKybStatus === "under_review") && !hasUploadedDocuments
       ? "not_started"
       : profileKybStatus;
 
@@ -395,8 +400,11 @@ export default function LenderKybVerificationPage() {
           <div className="flex justify-between mb-2">
             {statusSteps.map((step, index) => {
               const currentIndex = getCurrentStepIndex();
-              const isCompleted = index < currentIndex;
-              const isCurrent = index === currentIndex;
+              // When approved, all steps including the last one should be green
+              const isCompleted = kybStatus === "approved"
+                ? index <= currentIndex
+                : index < currentIndex;
+              const isCurrent = kybStatus !== "approved" && index === currentIndex;
 
               return (
                 <div
@@ -422,7 +430,11 @@ export default function LenderKybVerificationPage() {
                   </div>
                   <span
                     className={`text-xs mt-2 text-center ${
-                      isCurrent ? "text-[#E86A33] font-medium" : "text-gray-500"
+                      isCompleted
+                        ? "text-green-600 font-medium"
+                        : isCurrent
+                        ? "text-[#E86A33] font-medium"
+                        : "text-gray-500"
                     }`}
                   >
                     {step.label}
@@ -434,9 +446,13 @@ export default function LenderKybVerificationPage() {
           {/* Progress Line */}
           <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200 -z-0 mx-16" />
           <div
-            className="absolute top-4 left-0 h-0.5 bg-[#E86A33] -z-0 mx-16 transition-all"
+            className={`absolute top-4 left-0 h-0.5 -z-0 mx-16 transition-all ${
+              kybStatus === "approved" ? "bg-green-500" : "bg-[#E86A33]"
+            }`}
             style={{
-              width: `${(getCurrentStepIndex() / (statusSteps.length - 1)) * 100}%`,
+              width: kybStatus === "approved"
+                ? "100%"
+                : `${(getCurrentStepIndex() / (statusSteps.length - 1)) * 100}%`,
               maxWidth: "calc(100% - 8rem)",
             }}
           />
