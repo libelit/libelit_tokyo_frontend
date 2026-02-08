@@ -12,6 +12,9 @@ import {
   DollarSign,
   FileCheck,
   Loader2,
+  ImageIcon,
+  Star,
+  X,
 } from "lucide-react";
 import { DeveloperHeader } from "@/components/developer/developer-header";
 import { Button } from "@/components/ui/button";
@@ -19,8 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { projectsService } from "@/lib/api/developer";
-import { ProjectType, CreateProjectRequest } from "@/lib/types/developer";
+import { projectsService, projectPhotosService } from "@/lib/api/developer";
+import { ProjectType, CreateProjectRequest, UploadProjectPhotoData } from "@/lib/types/developer";
 import { toast } from "sonner";
 
 const projectTypes: { value: ProjectType; label: string }[] = [
@@ -33,10 +36,24 @@ const projectTypes: { value: ProjectType; label: string }[] = [
 
 const steps = [
   { id: 1, title: "Basic Info", icon: Building2 },
-  { id: 2, title: "Location", icon: MapPin },
-  { id: 3, title: "Financials", icon: DollarSign },
-  { id: 4, title: "Review", icon: FileCheck },
+  { id: 2, title: "Photos", icon: ImageIcon },
+  { id: 3, title: "Location", icon: MapPin },
+  { id: 4, title: "Financials", icon: DollarSign },
+  { id: 5, title: "Review", icon: FileCheck },
 ];
+
+interface PendingPhoto {
+  id: string;
+  file: File;
+  preview: string;
+  title: string;
+  is_featured: boolean;
+}
+
+const ACCEPTED_FORMATS = ".jpg,.jpeg,.png,.webp";
+const ACCEPTED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_SIZE_MB = 5;
+const MAX_PHOTOS = 10;
 
 interface ProjectFormData {
   // Step 1: Basic Info
@@ -79,6 +96,9 @@ export default function CreateProjectPage() {
   const [formData, setFormData] = useState<ProjectFormData>(initialFormData);
   const [errors, setErrors] = useState<ProjectFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const updateFormData = (field: keyof ProjectFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -86,6 +106,110 @@ export default function CreateProjectPage() {
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  // Photo handling functions
+  const validateFile = (file: File): string | null => {
+    if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
+      return `${file.name}: Invalid format. Only JPG, PNG, and WebP are allowed.`;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      return `${file.name}: File too large. Maximum size is ${MAX_SIZE_MB}MB.`;
+    }
+    return null;
+  };
+
+  const addPhotos = (files: FileList | File[]) => {
+    setPhotoError(null);
+    const fileArray = Array.from(files);
+    const remainingSlots = MAX_PHOTOS - pendingPhotos.length;
+
+    if (fileArray.length > remainingSlots) {
+      setPhotoError(`You can only add ${remainingSlots} more photo(s). Maximum ${MAX_PHOTOS} photos per project.`);
+      return;
+    }
+
+    const validationErrors: string[] = [];
+    const validFiles: File[] = [];
+
+    fileArray.forEach((file) => {
+      const error = validateFile(file);
+      if (error) {
+        validationErrors.push(error);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (validationErrors.length > 0) {
+      setPhotoError(validationErrors.join("\n"));
+      return;
+    }
+
+    const newPhotos: PendingPhoto[] = validFiles.map((file, index) => ({
+      id: `${Date.now()}-${index}-${file.name}`,
+      file,
+      preview: URL.createObjectURL(file),
+      title: "",
+      is_featured: pendingPhotos.length === 0 && index === 0,
+    }));
+
+    setPendingPhotos((prev) => [...prev, ...newPhotos]);
+  };
+
+  const removePhoto = (id: string) => {
+    setPendingPhotos((prev) => {
+      const photoToRemove = prev.find((p) => p.id === id);
+      if (photoToRemove) {
+        URL.revokeObjectURL(photoToRemove.preview);
+      }
+      const updated = prev.filter((p) => p.id !== id);
+      // If we removed the featured photo, make the first one featured
+      if (photoToRemove?.is_featured && updated.length > 0) {
+        updated[0].is_featured = true;
+      }
+      return updated;
+    });
+  };
+
+  const updatePhotoTitle = (id: string, title: string) => {
+    setPendingPhotos((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, title } : p))
+    );
+  };
+
+  const setPhotoFeatured = (id: string) => {
+    setPendingPhotos((prev) =>
+      prev.map((p) => ({ ...p, is_featured: p.id === id }))
+    );
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      addPhotos(files);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      addPhotos(files);
+    }
+    // Reset input
+    e.target.value = "";
   };
 
   const validateStep = (step: number): boolean => {
@@ -96,10 +220,12 @@ export default function CreateProjectPage() {
       if (!formData.projectType) newErrors.projectType = "Project type is required";
       if (!formData.description.trim()) newErrors.description = "Description is required";
     } else if (step === 2) {
+      // Photos step - optional, no validation required
+    } else if (step === 3) {
       if (!formData.address.trim()) newErrors.address = "Address is required";
       if (!formData.city.trim()) newErrors.city = "City is required";
       if (!formData.country.trim()) newErrors.country = "Country is required";
-    } else if (step === 3) {
+    } else if (step === 4) {
       if (!formData.fundingGoal) newErrors.fundingGoal = "Funding goal is required";
       if (!formData.minInvestment) newErrors.minInvestment = "Minimum investment is required";
       if (!formData.expectedReturn) newErrors.expectedReturn = "Expected return is required";
@@ -137,11 +263,43 @@ export default function CreateProjectPage() {
     };
   };
 
+  const uploadPendingPhotos = async (projectId: number) => {
+    if (pendingPhotos.length === 0) return;
+
+    const photosToUpload: UploadProjectPhotoData[] = pendingPhotos.map((p) => ({
+      file: p.file,
+      title: p.title || undefined,
+      is_featured: p.is_featured,
+    }));
+
+    try {
+      const response = await projectPhotosService.upload(projectId, photosToUpload);
+      if (response.data?.success) {
+        toast.success(`${pendingPhotos.length} photo(s) uploaded`);
+      } else {
+        toast.error("Some photos failed to upload");
+      }
+    } catch (error) {
+      console.error("Error uploading photos:", error);
+      toast.error("Failed to upload photos");
+    }
+
+    // Cleanup previews
+    pendingPhotos.forEach((p) => URL.revokeObjectURL(p.preview));
+  };
+
   const handleSaveDraft = async () => {
     setIsSubmitting(true);
     try {
       const response = await projectsService.create(buildProjectRequest());
       if (response.data?.success) {
+        const projectId = response.data.data.id;
+
+        // Upload photos if any
+        if (pendingPhotos.length > 0) {
+          await uploadPendingPhotos(projectId);
+        }
+
         toast.success("Project saved as draft");
         router.push("/developer/dashboard/projects");
       } else {
@@ -160,9 +318,16 @@ export default function CreateProjectPage() {
     try {
       const response = await projectsService.create(buildProjectRequest());
       if (response.data?.success) {
+        const projectId = response.data.data.id;
+
+        // Upload photos if any
+        if (pendingPhotos.length > 0) {
+          await uploadPendingPhotos(projectId);
+        }
+
         toast.success("Project created successfully");
         // Navigate to project details page to upload documents
-        router.push(`/developer/dashboard/projects/${response.data.data.id}`);
+        router.push(`/developer/dashboard/projects/${projectId}`);
       } else {
         toast.error(response.data?.message || "Failed to create project");
       }
@@ -316,8 +481,157 @@ export default function CreateProjectPage() {
           </div>
         )}
 
-        {/* Step 2: Location */}
+        {/* Step 2: Photos */}
         {currentStep === 2 && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold mb-1">Project Photos</h2>
+              <p className="text-sm text-gray-500">
+                Upload photos of your project. The first photo will be used as the cover image.
+              </p>
+            </div>
+
+            {/* Photo error */}
+            {photoError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700 whitespace-pre-line">{photoError}</p>
+              </div>
+            )}
+
+            {/* Drop zone */}
+            {pendingPhotos.length < MAX_PHOTOS && (
+              <div
+                className={cn(
+                  "border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors",
+                  isDragging
+                    ? "border-[#E86A33] bg-orange-50"
+                    : "border-gray-300 hover:border-gray-400 bg-white"
+                )}
+                onClick={() => document.getElementById("photo-input")?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <input
+                  id="photo-input"
+                  type="file"
+                  className="hidden"
+                  accept={ACCEPTED_FORMATS}
+                  multiple
+                  onChange={handleFileSelect}
+                />
+                <ImageIcon className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                <p className="text-sm text-gray-600 mb-1">
+                  <span className="text-[#E86A33] font-medium">Click to upload</span> or
+                  drag and drop
+                </p>
+                <p className="text-xs text-gray-400">
+                  JPG, PNG, WebP (max {MAX_SIZE_MB}MB each) - Up to {MAX_PHOTOS} photos
+                </p>
+              </div>
+            )}
+
+            {/* Photos grid */}
+            {pendingPhotos.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">
+                    {pendingPhotos.length}/{MAX_PHOTOS} photos selected
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      pendingPhotos.forEach((p) => URL.revokeObjectURL(p.preview));
+                      setPendingPhotos([]);
+                    }}
+                  >
+                    Clear all
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {pendingPhotos.map((photo) => (
+                    <div
+                      key={photo.id}
+                      className={cn(
+                        "relative rounded-lg border-2 overflow-hidden bg-gray-50",
+                        photo.is_featured ? "border-[#E86A33]" : "border-gray-200"
+                      )}
+                    >
+                      {/* Image preview */}
+                      <div className="aspect-square relative">
+                        <img
+                          src={photo.preview}
+                          alt={photo.title || "Photo preview"}
+                          className="w-full h-full object-cover"
+                        />
+
+                        {/* Featured badge */}
+                        {photo.is_featured && (
+                          <div className="absolute top-2 left-2 bg-[#E86A33] text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                            <Star className="h-3 w-3 fill-current" />
+                            Cover
+                          </div>
+                        )}
+
+                        {/* Actions overlay */}
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          {!photo.is_featured && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="icon"
+                              className="h-7 w-7 bg-white/90 hover:bg-white"
+                              onClick={() => setPhotoFeatured(photo.id)}
+                              title="Set as cover photo"
+                            >
+                              <Star className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="icon"
+                            className="h-7 w-7 bg-white/90 hover:bg-red-50 hover:text-red-600"
+                            onClick={() => removePhoto(photo.id)}
+                            title="Remove photo"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Title input */}
+                      <div className="p-2">
+                        <Input
+                          type="text"
+                          placeholder="Add title (optional)"
+                          value={photo.title}
+                          onChange={(e) => updatePhotoTitle(photo.id, e.target.value)}
+                          className="text-sm h-8"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Info box */}
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Tip:</strong> High-quality photos help attract more investors.
+                Include exterior views, interior shots, and site plans if available.
+                Photos will be uploaded when you save the project.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Location */}
+        {currentStep === 3 && (
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold mb-1">Project Location</h2>
@@ -374,8 +688,8 @@ export default function CreateProjectPage() {
           </div>
         )}
 
-        {/* Step 3: Financials */}
-        {currentStep === 3 && (
+        {/* Step 4: Financials */}
+        {currentStep === 4 && (
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold mb-1">Financial Details</h2>
@@ -476,8 +790,8 @@ export default function CreateProjectPage() {
           </div>
         )}
 
-        {/* Step 4: Review */}
-        {currentStep === 4 && (
+        {/* Step 5: Review */}
+        {currentStep === 5 && (
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold mb-1">Review Your Project</h2>
@@ -518,6 +832,54 @@ export default function CreateProjectPage() {
                 </dl>
               </div>
 
+              {/* Photos */}
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4 text-[#E86A33]" />
+                    Project Photos
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentStep(2)}
+                  >
+                    Edit
+                  </Button>
+                </div>
+                {pendingPhotos.length > 0 ? (
+                  <div className="flex gap-2 flex-wrap">
+                    {pendingPhotos.slice(0, 4).map((photo) => (
+                      <div
+                        key={photo.id}
+                        className={cn(
+                          "relative w-16 h-16 rounded-lg overflow-hidden",
+                          photo.is_featured && "ring-2 ring-[#E86A33]"
+                        )}
+                      >
+                        <img
+                          src={photo.preview}
+                          alt={photo.title || "Photo"}
+                          className="w-full h-full object-cover"
+                        />
+                        {photo.is_featured && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-[#E86A33] text-white text-[8px] text-center py-0.5">
+                            Cover
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {pendingPhotos.length > 4 && (
+                      <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-sm text-gray-500">
+                        +{pendingPhotos.length - 4}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No photos added (optional)</p>
+                )}
+              </div>
+
               {/* Location */}
               <div className="p-4 border rounded-lg">
                 <div className="flex items-center justify-between mb-3">
@@ -528,7 +890,7 @@ export default function CreateProjectPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setCurrentStep(2)}
+                    onClick={() => setCurrentStep(3)}
                   >
                     Edit
                   </Button>
@@ -559,7 +921,7 @@ export default function CreateProjectPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setCurrentStep(3)}
+                    onClick={() => setCurrentStep(4)}
                   >
                     Edit
                   </Button>

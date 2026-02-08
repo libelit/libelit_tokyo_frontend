@@ -137,7 +137,7 @@ export default function ProjectsPage() {
     fundingGoal: project.funding_goal,
     status: project.status,
     createdAt: project.created_at,
-    imageUrl: undefined, // Projects don't have images yet
+    imageUrl: project.cover_photo_url ?? undefined,
     onDelete: project.status === "draft" ? handleDeleteProject : undefined,
   });
 

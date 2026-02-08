@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -10,6 +10,7 @@ import {
   DollarSign,
   Loader2,
   AlertCircle,
+  ImageIcon,
 } from "lucide-react";
 import { DeveloperHeader } from "@/components/developer/developer-header";
 import { Button } from "@/components/ui/button";
@@ -17,9 +18,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { projectsService } from "@/lib/api/developer";
-import { Project, ProjectType, UpdateProjectRequest } from "@/lib/types/developer";
+import { projectsService, projectPhotosService } from "@/lib/api/developer";
+import { Project, ProjectType, UpdateProjectRequest, ProjectPhoto, UploadProjectPhotoData } from "@/lib/types/developer";
 import { toast } from "sonner";
+import { ProjectPhotoUpload, PendingPhoto } from "@/components/developer/project-photo-upload";
+import { ProjectPhotoGallery } from "@/components/developer/project-photo-gallery";
 
 const projectTypes: { value: ProjectType; label: string }[] = [
   { value: "residential", label: "Residential" },
@@ -69,6 +72,19 @@ export default function EditProjectPage() {
   const [errors, setErrors] = useState<ProjectFormErrors>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [photos, setPhotos] = useState<ProjectPhoto[]>([]);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+
+  const fetchPhotos = useCallback(async () => {
+    try {
+      const response = await projectPhotosService.list(projectId);
+      if (response.data?.success) {
+        setPhotos(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching photos:", error);
+    }
+  }, [projectId]);
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -100,6 +116,9 @@ export default function EditProjectPage() {
             loanTermMonths: p.loan_term_months.toString(),
             ltvRatio: p.ltv_ratio?.toString() || "",
           });
+
+          // Fetch photos
+          fetchPhotos();
         } else {
           toast.error("Failed to load project");
           router.push("/developer/dashboard/projects");
@@ -114,7 +133,7 @@ export default function EditProjectPage() {
     };
 
     fetchProject();
-  }, [projectId, router]);
+  }, [projectId, router, fetchPhotos]);
 
   const updateFormData = (field: keyof ProjectFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -140,6 +159,76 @@ export default function EditProjectPage() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleUploadPhotos = async (pendingPhotos: PendingPhoto[]) => {
+    setIsUploadingPhotos(true);
+    try {
+      const photosToUpload: UploadProjectPhotoData[] = pendingPhotos.map((p) => ({
+        file: p.file,
+        title: p.title || undefined,
+        is_featured: p.is_featured,
+      }));
+
+      const response = await projectPhotosService.upload(projectId, photosToUpload);
+      if (response.data?.success) {
+        toast.success(`${pendingPhotos.length} photo(s) uploaded`);
+        fetchPhotos();
+      } else {
+        toast.error(response.data?.message || "Failed to upload photos");
+        throw new Error("Upload failed");
+      }
+    } catch (error) {
+      console.error("Error uploading photos:", error);
+      throw error;
+    } finally {
+      setIsUploadingPhotos(false);
+    }
+  };
+
+  const handleSetFeatured = async (photoId: number) => {
+    try {
+      const response = await projectPhotosService.update(projectId, photoId, { is_featured: true });
+      if (response.data?.success) {
+        toast.success("Cover photo updated");
+        fetchPhotos();
+      } else {
+        toast.error("Failed to update cover photo");
+      }
+    } catch (error) {
+      console.error("Error updating photo:", error);
+      toast.error("Failed to update cover photo");
+    }
+  };
+
+  const handleUpdateTitle = async (photoId: number, title: string) => {
+    try {
+      const response = await projectPhotosService.update(projectId, photoId, { title });
+      if (response.data?.success) {
+        toast.success("Photo title updated");
+        fetchPhotos();
+      } else {
+        toast.error("Failed to update title");
+      }
+    } catch (error) {
+      console.error("Error updating photo:", error);
+      toast.error("Failed to update title");
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: number) => {
+    try {
+      const response = await projectPhotosService.delete(projectId, photoId);
+      if (response.data?.success) {
+        toast.success("Photo deleted");
+        fetchPhotos();
+      } else {
+        toast.error("Failed to delete photo");
+      }
+    } catch (error) {
+      console.error("Error deleting photo:", error);
+      toast.error("Failed to delete photo");
+    }
   };
 
   const handleSubmit = async () => {
@@ -297,6 +386,50 @@ export default function EditProjectPage() {
                 <p className="text-sm text-red-500 mt-1">{errors.description}</p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Project Photos */}
+        <div className="rounded-xl border bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+            <ImageIcon className="h-5 w-5 text-[#E86A33]" />
+            Project Photos
+          </h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Add photos to showcase your project. The cover photo will be displayed prominently.
+          </p>
+
+          <div className="space-y-6">
+            {/* Existing photos */}
+            {photos.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  Current Photos ({photos.length}/10)
+                </h3>
+                <ProjectPhotoGallery
+                  photos={photos}
+                  isEditable={true}
+                  onSetFeatured={handleSetFeatured}
+                  onUpdateTitle={handleUpdateTitle}
+                  onDelete={handleDeletePhoto}
+                />
+              </div>
+            )}
+
+            {/* Upload new photos */}
+            {photos.length < 10 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  Add More Photos
+                </h3>
+                <ProjectPhotoUpload
+                  maxPhotos={10}
+                  existingPhotoCount={photos.length}
+                  onUpload={handleUploadPhotos}
+                  isUploading={isUploadingPhotos}
+                />
+              </div>
+            )}
           </div>
         </div>
 

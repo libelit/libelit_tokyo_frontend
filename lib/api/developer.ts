@@ -23,6 +23,11 @@ import {
   UploadProofData,
   ProofListResponse,
   ProofUploadResponse,
+  UploadProjectPhotoData,
+  UpdateProjectPhotoData,
+  ProjectPhotoListResponse,
+  ProjectPhotoUploadResponse,
+  ProjectPhotoResponse,
 } from "../types/developer";
 
 // Developer Profile Service
@@ -224,6 +229,54 @@ export const milestonesService = {
   ): Promise<ApiResponse<DeleteResponse>> {
     return apiClient.delete<DeleteResponse>(
       `/developer/projects/${projectId}/milestones/${milestoneId}/proofs/${proofId}`
+    );
+  },
+};
+
+// Project Photos Service
+export const projectPhotosService = {
+  async list(projectId: number): Promise<ApiResponse<ProjectPhotoListResponse>> {
+    return apiClient.get<ProjectPhotoListResponse>(
+      `/developer/projects/${projectId}/photos`
+    );
+  },
+
+  async upload(
+    projectId: number,
+    photos: UploadProjectPhotoData[]
+  ): Promise<ApiResponse<ProjectPhotoUploadResponse>> {
+    const formData = new FormData();
+    photos.forEach((photo, index) => {
+      formData.append(`photos[${index}][file]`, photo.file);
+      if (photo.title) {
+        formData.append(`photos[${index}][title]`, photo.title);
+      }
+      formData.append(`photos[${index}][is_featured]`, photo.is_featured ? 'true' : 'false');
+    });
+
+    return apiClient.upload<ProjectPhotoUploadResponse>(
+      `/developer/projects/${projectId}/photos`,
+      formData
+    );
+  },
+
+  async update(
+    projectId: number,
+    photoId: number,
+    data: UpdateProjectPhotoData
+  ): Promise<ApiResponse<ProjectPhotoResponse>> {
+    return apiClient.put<ProjectPhotoResponse>(
+      `/developer/projects/${projectId}/photos/${photoId}`,
+      data
+    );
+  },
+
+  async delete(
+    projectId: number,
+    photoId: number
+  ): Promise<ApiResponse<DeleteResponse>> {
+    return apiClient.delete<DeleteResponse>(
+      `/developer/projects/${projectId}/photos/${photoId}`
     );
   },
 };

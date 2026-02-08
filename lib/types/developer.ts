@@ -111,6 +111,9 @@ export interface Project {
   updated_at: string;
   documents_count?: number;
   documents?: Document[];
+  photos?: ProjectPhoto[];
+  cover_photo?: ProjectPhoto | null;
+  cover_photo_url?: string | null;
 }
 
 export type ProjectType = 'residential' | 'commercial' | 'mixed_use' | 'industrial' | 'land';
@@ -227,6 +230,46 @@ export interface SubmitProjectResponse {
 export interface DeleteResponse {
   success: boolean;
   message: string;
+}
+
+// Project Photo Types
+export interface ProjectPhoto {
+  id: number;
+  uuid: string;
+  file_url: string;
+  file_name: string;
+  title: string | null;
+  is_featured: boolean;
+  sort_order: number;
+}
+
+export interface UploadProjectPhotoData {
+  file: File;
+  title?: string;
+  is_featured?: boolean;
+}
+
+export interface UpdateProjectPhotoData {
+  title?: string;
+  is_featured?: boolean;
+  sort_order?: number;
+}
+
+export interface ProjectPhotoResponse {
+  success: boolean;
+  message: string;
+  data: ProjectPhoto;
+}
+
+export interface ProjectPhotoListResponse {
+  success: boolean;
+  data: ProjectPhoto[];
+}
+
+export interface ProjectPhotoUploadResponse {
+  success: boolean;
+  message: string;
+  data: ProjectPhoto[];
 }
 
 // Milestone Types

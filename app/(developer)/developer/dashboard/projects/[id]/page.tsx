@@ -35,7 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { projectsService, projectDocumentsService, milestonesService } from "@/lib/api/developer";
+import { projectsService, projectDocumentsService, milestonesService, projectPhotosService } from "@/lib/api/developer";
 import {
   Project,
   Document,
@@ -46,8 +46,12 @@ import {
   CreateMilestoneData,
   MilestoneProof,
   MilestoneProofType,
+  ProjectPhoto,
+  UploadProjectPhotoData,
 } from "@/lib/types/developer";
 import { toast } from "sonner";
+import { ProjectPhotoUpload, PendingPhoto } from "@/components/developer/project-photo-upload";
+import { ProjectPhotoGallery } from "@/components/developer/project-photo-gallery";
 
 // Map document type to display info
 const documentTypeInfo: Record<string, { title: string; description: string }> = {
@@ -98,7 +102,7 @@ export default function ProjectDetailsPage() {
   const router = useRouter();
   const projectId = Number(params.id);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "documents" | "milestones" | "proposals">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "photos" | "documents" | "milestones" | "proposals">("overview");
   const [project, setProject] = useState<Project | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
@@ -107,6 +111,10 @@ export default function ProjectDetailsPage() {
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Photo state
+  const [photos, setPhotos] = useState<ProjectPhoto[]>([]);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
 
   // Milestone state
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
@@ -169,14 +177,25 @@ export default function ProjectDetailsPage() {
     }
   }, [projectId]);
 
+  const fetchPhotos = useCallback(async () => {
+    try {
+      const response = await projectPhotosService.list(projectId);
+      if (response.data?.success) {
+        setPhotos(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching photos:", error);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchProject(), fetchDocuments(), fetchMilestones()]);
+      await Promise.all([fetchProject(), fetchDocuments(), fetchMilestones(), fetchPhotos()]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchProject, fetchDocuments, fetchMilestones]);
+  }, [fetchProject, fetchDocuments, fetchMilestones, fetchPhotos]);
 
   const canEdit = project?.status === "draft" || project?.status === "rejected";
   const canSubmit = project?.status === "draft";
@@ -232,6 +251,77 @@ export default function ProjectDetailsPage() {
       toast.error("Failed to remove document");
     } finally {
       setDeletingDocId(null);
+    }
+  };
+
+  // Photo handlers
+  const handleUploadPhotos = async (pendingPhotos: PendingPhoto[]) => {
+    setIsUploadingPhotos(true);
+    try {
+      const photosToUpload: UploadProjectPhotoData[] = pendingPhotos.map((p) => ({
+        file: p.file,
+        title: p.title || undefined,
+        is_featured: p.is_featured,
+      }));
+
+      const response = await projectPhotosService.upload(projectId, photosToUpload);
+      if (response.data?.success) {
+        toast.success(`${pendingPhotos.length} photo(s) uploaded`);
+        fetchPhotos();
+      } else {
+        toast.error(response.data?.message || "Failed to upload photos");
+        throw new Error("Upload failed");
+      }
+    } catch (error) {
+      console.error("Error uploading photos:", error);
+      throw error;
+    } finally {
+      setIsUploadingPhotos(false);
+    }
+  };
+
+  const handleSetPhotoFeatured = async (photoId: number) => {
+    try {
+      const response = await projectPhotosService.update(projectId, photoId, { is_featured: true });
+      if (response.data?.success) {
+        toast.success("Cover photo updated");
+        fetchPhotos();
+      } else {
+        toast.error("Failed to update cover photo");
+      }
+    } catch (error) {
+      console.error("Error updating photo:", error);
+      toast.error("Failed to update cover photo");
+    }
+  };
+
+  const handleUpdatePhotoTitle = async (photoId: number, title: string) => {
+    try {
+      const response = await projectPhotosService.update(projectId, photoId, { title });
+      if (response.data?.success) {
+        toast.success("Photo title updated");
+        fetchPhotos();
+      } else {
+        toast.error("Failed to update title");
+      }
+    } catch (error) {
+      console.error("Error updating photo:", error);
+      toast.error("Failed to update title");
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: number) => {
+    try {
+      const response = await projectPhotosService.delete(projectId, photoId);
+      if (response.data?.success) {
+        toast.success("Photo deleted");
+        fetchPhotos();
+      } else {
+        toast.error("Failed to delete photo");
+      }
+    } catch (error) {
+      console.error("Error deleting photo:", error);
+      toast.error("Failed to delete photo");
     }
   };
 
@@ -535,6 +625,21 @@ export default function ProjectDetailsPage() {
             Overview
           </button>
           <button
+            onClick={() => setActiveTab("photos")}
+            className={`pb-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === "photos"
+                ? "border-[#E86A33] text-[#E86A33]"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Photos
+            {photos.length > 0 && (
+              <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">
+                {photos.length}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab("milestones")}
             className={`pb-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
               activeTab === "milestones"
@@ -712,6 +817,96 @@ export default function ProjectDetailsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "photos" && (
+        <div className="space-y-6">
+          {/* Photos Header */}
+          <div className="rounded-xl border bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Image className="h-5 w-5 text-[#E86A33]" />
+                  Project Photos
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Showcase your project with photos. The cover photo will be displayed prominently.
+                </p>
+              </div>
+              <span className="text-sm text-gray-500">
+                {photos.length}/10 photos
+              </span>
+            </div>
+
+            {/* Cover Photo */}
+            {photos.some((p) => p.is_featured) && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Cover Photo</h3>
+                <div className="relative aspect-video max-w-2xl rounded-xl overflow-hidden border-2 border-[#E86A33]">
+                  <img
+                    src={photos.find((p) => p.is_featured)?.file_url}
+                    alt="Cover photo"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Existing Photos Gallery */}
+          {photos.length > 0 && (
+            <div className="rounded-xl border bg-white p-6 shadow-sm">
+              <h3 className="font-semibold mb-4">All Photos</h3>
+              <ProjectPhotoGallery
+                photos={photos}
+                isEditable={canEdit}
+                onSetFeatured={canEdit ? handleSetPhotoFeatured : undefined}
+                onUpdateTitle={canEdit ? handleUpdatePhotoTitle : undefined}
+                onDelete={canEdit ? handleDeletePhoto : undefined}
+              />
+            </div>
+          )}
+
+          {/* Upload New Photos */}
+          {canEdit && photos.length < 10 && (
+            <div className="rounded-xl border bg-white p-6 shadow-sm">
+              <h3 className="font-semibold mb-4">Upload New Photos</h3>
+              <ProjectPhotoUpload
+                maxPhotos={10}
+                existingPhotoCount={photos.length}
+                onUpload={handleUploadPhotos}
+                isUploading={isUploadingPhotos}
+              />
+            </div>
+          )}
+
+          {/* Empty State */}
+          {photos.length === 0 && (
+            <div className="rounded-xl border bg-white p-12 text-center">
+              <Image className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Photos Yet</h3>
+              <p className="text-gray-500 mb-4">
+                Add photos to showcase your project to potential lenders.
+              </p>
+              {canEdit && (
+                <p className="text-sm text-gray-400">
+                  Use the upload section above to add photos.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Info Box */}
+          <div className="rounded-xl border bg-blue-50 border-blue-200 p-6">
+            <h3 className="font-medium text-blue-800 mb-2">Photo Tips</h3>
+            <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
+              <li>High-quality photos help attract more investor interest</li>
+              <li>Include exterior views, interior shots, and site plans</li>
+              <li>The cover photo will be displayed on the project listing</li>
+              <li>Maximum 10 photos, 5MB each (JPG, PNG, WebP)</li>
+            </ul>
           </div>
         </div>
       )}
