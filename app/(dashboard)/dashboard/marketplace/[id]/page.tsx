@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, CalendarCheck, ChevronLeft, ChevronRight, Maximize2, ArrowRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LoanProposalModal, LoanProposalFormData } from "@/components/dashboard/loan-proposal-modal";
 
 // Hardcoded project data - in real app this would come from API
 const projectData = {
@@ -89,6 +90,8 @@ export default function ProjectDetailsPage() {
   const [aboutImageIndex, setAboutImageIndex] = useState(0);
   const [showVRTour, setShowVRTour] = useState(false);
   const [showLiveCamera, setShowLiveCamera] = useState(false);
+  const [showLoanProposalModal, setShowLoanProposalModal] = useState(false);
+  const [proposalSubmitted, setProposalSubmitted] = useState(false);
 
   const nextAboutImage = () => {
     setAboutImageIndex((prev) => (prev + 1) % aboutGalleryImages.length);
@@ -122,6 +125,12 @@ export default function ProjectDetailsPage() {
 
   const prevProgressImage = () => {
     setProgressImageIndex((prev) => (prev - 1 + progressGalleryImages.length) % progressGalleryImages.length);
+  };
+
+  const handleLoanProposalSubmit = (data: LoanProposalFormData) => {
+    // TODO: Integrate with API to submit loan proposal
+    console.log("Loan proposal submitted:", data);
+    setProposalSubmitted(true);
   };
 
   const tabs = [
@@ -226,10 +235,20 @@ export default function ProjectDetailsPage() {
                 </div>
               </div>
 
-              {/* CTA Button */}
-              <Button className="bg-[#E86A33] hover:bg-[#d55a25] text-white px-6 h-10 text-sm font-medium whitespace-nowrap rounded-full cursor-pointer">
-                Submit Loan Offer
-              </Button>
+              {/* CTA Button or Status */}
+              {proposalSubmitted ? (
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-full">
+                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                  <span className="text-sm font-medium text-amber-700">Submitted for Review</span>
+                </div>
+              ) : (
+                <Button
+                  onClick={() => setShowLoanProposalModal(true)}
+                  className="bg-[#E86A33] hover:bg-[#d55a25] text-white px-6 h-10 text-sm font-medium whitespace-nowrap rounded-full cursor-pointer"
+                >
+                  Submit Loan Offer
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -580,6 +599,17 @@ export default function ProjectDetailsPage() {
           </div>
         </div>
       )}
+
+      {/* Loan Proposal Modal */}
+      <LoanProposalModal
+        open={showLoanProposalModal}
+        onOpenChange={setShowLoanProposalModal}
+        projectId={projectData.id}
+        projectName={projectData.name}
+        projectImage="/images/house.png"
+        loanValue={projectData.loanValue}
+        onSubmit={handleLoanProposalSubmit}
+      />
     </div>
   );
 }
