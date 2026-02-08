@@ -100,7 +100,7 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
           <span className="text-sm font-bold text-[#E86A33]">
             {formatPrice(project.loanValue)}
           </span>
-          <span className="text-xs text-muted-foreground">Loan Amount Asked</span>
+          <span className="text-xs text-muted-foreground">Requested Loan Amount</span>
         </div>
 
         <div className="space-y-1 text-xs">

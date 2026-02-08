@@ -146,6 +146,49 @@ export interface LenderProjectDeveloper {
 export type LenderProjectType = 'residential' | 'commercial' | 'mixed_use' | 'industrial' | 'land';
 export type LenderProjectStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'funded' | 'completed';
 
+export interface LenderProjectDocument {
+  id: number;
+  document_type: string;
+  document_type_label: string;
+  title: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  file_size_formatted: string;
+  mime_type: string;
+  verification_status: 'pending' | 'approved' | 'rejected';
+  verified_at: string | null;
+  rejection_reason: string | null;
+  expires_at: string | null;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  file_url: string;
+}
+
+export interface LenderProjectMilestone {
+  id: number;
+  project_id: number;
+  title: string;
+  description: string | null;
+  sequence: number;
+  amount: string;
+  percentage: string;
+  status: 'pending' | 'proof_submitted' | 'approved' | 'paid' | 'rejected';
+  status_label: string;
+  due_date: string | null;
+  proof_submitted_at: string | null;
+  approved_at: string | null;
+  approved_by: number | null;
+  paid_at: string | null;
+  payment_reference: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  proofs: unknown[];
+  can_complete: boolean;
+}
+
 export interface LenderProject {
   id: number;
   uuid: string;
@@ -173,6 +216,9 @@ export interface LenderProject {
   created_at: string;
   updated_at: string;
   developer: LenderProjectDeveloper | null;
+  documents?: LenderProjectDocument[];
+  documents_count?: number;
+  milestones?: LenderProjectMilestone[];
   milestones_count: number;
   lenders_count: number;
   cover_photo_url: string | null;

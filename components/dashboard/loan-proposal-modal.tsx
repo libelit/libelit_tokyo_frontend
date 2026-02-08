@@ -193,7 +193,7 @@ export function LoanProposalModal({
     return (
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="max-w-md">
-          <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
+          <div className="flex flex-col items-center justify-center p-8 text-center">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
@@ -250,11 +250,11 @@ export function LoanProposalModal({
               alt={projectName}
               fill
               className="object-cover"
+              unoptimized
             />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">{projectName}</p>
-            <p className="text-xs text-gray-500">Project ID: {projectId}</p>
             <div className="mt-1">
               <p className="text-xs text-gray-500">Requested Loan Amount</p>
               <p className="text-base font-bold text-[#E86A33]">

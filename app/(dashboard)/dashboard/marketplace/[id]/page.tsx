@@ -4,20 +4,11 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, ChevronLeft, ChevronRight, ArrowRight, X, XCircle, Loader2, ExternalLink, Download } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, ChevronLeft, ChevronRight, ArrowRight, X, XCircle, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoanProposalModal, LoanProposalFormData } from "@/components/dashboard/loan-proposal-modal";
 import { loanProposalsService, LoanProposal, SecurityPackageType } from "@/lib/api/loan-proposals";
-import {
-  lenderProjectsService,
-  lenderProjectDocumentsService,
-  lenderMilestonesService,
-} from "@/lib/api";
-import type {
-  Document,
-  ProjectMilestone,
-  MilestoneStatistics,
-} from "@/lib/types/developer";
+import { lenderProjectsService } from "@/lib/api";
 import type { LenderProject } from "@/lib/types/lender";
 import { toast } from "sonner";
 
@@ -48,9 +39,6 @@ export default function ProjectDetailsPage() {
 
   // Project state
   const [project, setProject] = useState<LenderProject | null>(null);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
-  const [milestoneStats, setMilestoneStats] = useState<MilestoneStatistics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,8 +69,9 @@ export default function ProjectDetailsPage() {
   // Mock lender ID - in real app this would come from auth context
   const MOCK_LENDER_ID = "lender-1";
 
-  // Fetch project data
+  // Fetch project data (includes documents, milestones, photos inline)
   const fetchProject = useCallback(async () => {
+    setIsLoading(true);
     try {
       const response = await lenderProjectsService.get(projectId);
       if (response.data?.success) {
@@ -93,46 +82,17 @@ export default function ProjectDetailsPage() {
     } catch (err) {
       console.error("Error fetching project:", err);
       setError("Failed to load project");
-    }
-  }, [projectId]);
-
-  // Fetch documents
-  const fetchDocuments = useCallback(async () => {
-    try {
-      const response = await lenderProjectDocumentsService.list(projectId);
-      if (response.data?.success) {
-        setDocuments(response.data.data.documents || []);
-      }
-    } catch (err) {
-      console.error("Error fetching documents:", err);
-    }
-  }, [projectId]);
-
-  // Fetch milestones
-  const fetchMilestones = useCallback(async () => {
-    try {
-      const response = await lenderMilestonesService.list(projectId);
-      if (response.data?.success) {
-        setMilestones(response.data.data.milestones || []);
-        setMilestoneStats(response.data.data.statistics || null);
-      }
-    } catch (err) {
-      console.error("Error fetching milestones:", err);
-    }
-  }, [projectId]);
-
-  // Load all data on mount
-  // Note: Photos are now included inline with project data
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      await Promise.all([fetchProject(), fetchDocuments(), fetchMilestones()]);
+    } finally {
       setIsLoading(false);
-    };
-    if (projectId) {
-      loadData();
     }
-  }, [projectId, fetchProject, fetchDocuments, fetchMilestones]);
+  }, [projectId]);
+
+  // Load project on mount
+  useEffect(() => {
+    if (projectId) {
+      fetchProject();
+    }
+  }, [projectId, fetchProject]);
 
   // Fetch existing proposal on page load
   const fetchProposal = useCallback(async () => {
@@ -658,28 +618,36 @@ export default function ProjectDetailsPage() {
         <div ref={documentsRef} className="scroll-mt-20">
           <h3 className="text-lg font-semibold mb-4">Documentation</h3>
           <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <h4 className="text-sm font-medium text-gray-700 mb-4">Project documents</h4>
-            {documents.length > 0 ? (
+            <h4 className="text-sm font-medium text-gray-700 mb-4">Project documents ({project.documents?.length || 0})</h4>
+            {project.documents && project.documents.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {documents.map((doc) => (
-                  <a
+                {project.documents.map((doc) => (
+                  <div
                     key={doc.id}
-                    href={doc.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors"
                   >
                     {doc.verification_status === "approved" ? (
                       <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                    ) : doc.verification_status === "rejected" ? (
+                      <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
                     ) : (
                       <Circle className="h-5 w-5 text-gray-300 flex-shrink-0" />
                     )}
-                    <div className="flex items-center gap-2 flex-1">
-                      <FileText className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm">{doc.title}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{doc.document_type_label}</p>
+                      <p className="text-xs text-gray-500">{doc.file_size_formatted}</p>
                     </div>
-                    <Download className="h-4 w-4 text-gray-400" />
-                  </a>
+                    <a
+                      href={doc.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button variant="outline" size="sm" className="text-xs">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </a>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -692,34 +660,12 @@ export default function ProjectDetailsPage() {
         </div>
 
         {/* Milestones Section (if available) */}
-        {milestones.length > 0 && (
+        {project.milestones && project.milestones.length > 0 && (
           <div className="scroll-mt-20">
-            <h3 className="text-lg font-semibold mb-4">Project Milestones</h3>
+            <h3 className="text-lg font-semibold mb-4">Project Milestones ({project.milestones_count})</h3>
             <div className="rounded-xl border bg-white p-6 shadow-sm">
-              {/* Milestone Stats */}
-              {milestoneStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="text-xs text-gray-500">Total Milestones</p>
-                    <p className="text-lg font-semibold">{milestoneStats.total_milestones}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Completed</p>
-                    <p className="text-lg font-semibold text-green-600">{milestoneStats.completed_milestones}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Progress</p>
-                    <p className="text-lg font-semibold">{milestoneStats.progress_percentage}%</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Paid Amount</p>
-                    <p className="text-lg font-semibold text-green-600">${milestoneStats.paid_amount.toLocaleString()}</p>
-                  </div>
-                </div>
-              )}
-
               <div className="space-y-4">
-                {milestones.map((milestone, index) => (
+                {project.milestones.map((milestone, index) => (
                   <div
                     key={milestone.id}
                     className="flex items-start gap-4 p-4 rounded-lg border border-gray-100"
@@ -743,7 +689,7 @@ export default function ProjectDetailsPage() {
                         <p className="text-sm text-gray-600 mb-2">{milestone.description}</p>
                       )}
                       <div className="flex items-center gap-4 text-xs text-gray-500">
-                        <span>${milestone.amount.toLocaleString()} ({milestone.percentage}%)</span>
+                        <span>${Number(milestone.amount).toLocaleString()} ({milestone.percentage}%)</span>
                         {milestone.due_date && (
                           <span>Due: {formatDate(milestone.due_date)}</span>
                         )}
