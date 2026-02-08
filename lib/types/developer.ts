@@ -94,14 +94,12 @@ export interface Project {
   address: string | null;
   city: string | null;
   country: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  funding_goal: number;
-  amount_raised: number;
+  loan_amount: number;
   min_investment: number;
-  expected_return: number;
-  loan_term_months: number;
-  ltv_ratio: number | null;
+  currency: string;
+  construction_start_date: string | null;
+  construction_end_date: string | null;
+  amount_raised?: number;
   status: ProjectStatus;
   submitted_at: string | null;
   approved_at: string | null;
@@ -134,13 +132,11 @@ export interface CreateProjectRequest {
   address?: string;
   city?: string;
   country?: string;
-  latitude?: number;
-  longitude?: number;
-  funding_goal: number;
+  loan_amount: number;
   min_investment: number;
-  expected_return: number;
-  loan_term_months: number;
-  ltv_ratio?: number;
+  currency: string;
+  construction_start_date: string;
+  construction_end_date: string;
 }
 
 export interface UpdateProjectRequest {
@@ -150,13 +146,11 @@ export interface UpdateProjectRequest {
   address?: string;
   city?: string;
   country?: string;
-  latitude?: number;
-  longitude?: number;
-  funding_goal?: number;
+  loan_amount?: number;
   min_investment?: number;
-  expected_return?: number;
-  loan_term_months?: number;
-  ltv_ratio?: number;
+  currency?: string;
+  construction_start_date?: string;
+  construction_end_date?: string;
 }
 
 // API Response Types
@@ -334,7 +328,7 @@ export interface MilestoneStatistics {
   progress_percentage: number;
   total_amount: number;
   paid_amount: number;
-  funding_goal: number;
+  loan_amount: number;
   allocation_complete: boolean;
 }
 

@@ -134,7 +134,7 @@ export default function ProjectsPage() {
     title: project.title,
     type: project.project_type.replace("_", " "),
     location: [project.city, project.country].filter(Boolean).join(", ") || "Location not set",
-    fundingGoal: project.funding_goal,
+    fundingGoal: project.loan_amount,
     status: project.status,
     createdAt: project.created_at,
     imageUrl: project.cover_photo_url ?? undefined,
@@ -253,9 +253,9 @@ export default function ProjectsPage() {
               </p>
             </div>
             <div className="p-4 rounded-lg bg-blue-50">
-              <p className="text-sm text-gray-500">Total Funding Goal</p>
+              <p className="text-sm text-gray-500">Total Loan Amount</p>
               <p className="text-2xl font-bold text-blue-600">
-                ${projects.reduce((sum, p) => sum + p.funding_goal, 0).toLocaleString()}
+                ${projects.reduce((sum, p) => sum + p.loan_amount, 0).toLocaleString()}
               </p>
             </div>
           </div>

@@ -180,7 +180,7 @@ export default function DeveloperDashboardPage() {
                 <div>
                   <h3 className="font-medium">{project.title}</h3>
                   <p className="text-sm text-gray-500">
-                    ${project.funding_goal.toLocaleString()} goal
+                    ${project.loan_amount.toLocaleString()} loan
                   </p>
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-full ${getStatusStyle(project.status)}`}>

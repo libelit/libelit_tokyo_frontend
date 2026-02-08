@@ -411,9 +411,9 @@ export default function ProjectDetailsPage() {
     }
 
     const total = calculateMilestoneTotal();
-    const fundingGoal = project?.funding_goal || 0;
-    if (Math.abs(total - fundingGoal) > 0.01) {
-      toast.error(`Total milestone amounts ($${total.toLocaleString()}) must equal funding goal ($${fundingGoal.toLocaleString()})`);
+    const loanAmount = project?.loan_amount || 0;
+    if (Math.abs(total - loanAmount) > 0.01) {
+      toast.error(`Total milestone amounts ($${total.toLocaleString()}) must equal loan amount ($${loanAmount.toLocaleString()})`);
       return;
     }
 
@@ -728,31 +728,37 @@ export default function ProjectDetailsPage() {
               </h2>
               <dl className="space-y-4">
                 <div className="flex justify-between">
-                  <dt className="text-gray-500">Funding Goal</dt>
-                  <dd className="font-semibold">${project.funding_goal.toLocaleString()}</dd>
+                  <dt className="text-gray-500">Loan Amount</dt>
+                  <dd className="font-semibold">${project.loan_amount.toLocaleString()}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Min Investment</dt>
                   <dd className="font-medium">${project.min_investment.toLocaleString()}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-gray-500 flex items-center gap-1">
-                    <Percent className="h-3 w-3" />
-                    Expected Return
-                  </dt>
-                  <dd className="font-medium text-green-600">{project.expected_return}%</dd>
+                  <dt className="text-gray-500">Currency</dt>
+                  <dd className="font-medium">{project.currency}</dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-500 flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Loan Term
-                  </dt>
-                  <dd className="font-medium">{project.loan_term_months} months</dd>
-                </div>
-                {project.ltv_ratio && (
+                {project.construction_start_date && (
                   <div className="flex justify-between">
-                    <dt className="text-gray-500">LTV Ratio</dt>
-                    <dd className="font-medium">{project.ltv_ratio}%</dd>
+                    <dt className="text-gray-500 flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Construction Start
+                    </dt>
+                    <dd className="font-medium">
+                      {new Date(project.construction_start_date).toLocaleDateString()}
+                    </dd>
+                  </div>
+                )}
+                {project.construction_end_date && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500 flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Construction End
+                    </dt>
+                    <dd className="font-medium">
+                      {new Date(project.construction_end_date).toLocaleDateString()}
+                    </dd>
                   </div>
                 )}
               </dl>
@@ -963,8 +969,8 @@ export default function ProjectDetailsPage() {
                     <p className="text-lg font-semibold text-green-600">${milestoneStats.paid_amount.toLocaleString()}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Funding Goal</p>
-                    <p className="text-lg font-semibold">${milestoneStats.funding_goal.toLocaleString()}</p>
+                    <p className="text-sm text-gray-500">Loan Amount</p>
+                    <p className="text-lg font-semibold">${milestoneStats.loan_amount.toLocaleString()}</p>
                   </div>
                 </div>
               </>
@@ -974,7 +980,7 @@ export default function ProjectDetailsPage() {
               <div className="mt-4 p-3 bg-amber-50 rounded-lg flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-amber-500" />
                 <p className="text-sm text-amber-700">
-                  Milestone total (${milestoneStats.total_amount.toLocaleString()}) does not match funding goal (${milestoneStats.funding_goal.toLocaleString()})
+                  Milestone total (${milestoneStats.total_amount.toLocaleString()}) does not match loan amount (${milestoneStats.loan_amount.toLocaleString()})
                 </p>
               </div>
             )}
@@ -986,11 +992,11 @@ export default function ProjectDetailsPage() {
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Edit Milestones</h3>
                 <div className="text-sm">
-                  <span className={calculateMilestoneTotal() === project?.funding_goal ? "text-green-600" : "text-amber-600"}>
+                  <span className={calculateMilestoneTotal() === project?.loan_amount ? "text-green-600" : "text-amber-600"}>
                     Total: ${calculateMilestoneTotal().toLocaleString()}
                   </span>
                   <span className="text-gray-400 mx-2">/</span>
-                  <span className="text-gray-600">Goal: ${project?.funding_goal.toLocaleString()}</span>
+                  <span className="text-gray-600">Loan: ${project?.loan_amount.toLocaleString()}</span>
                 </div>
               </div>
 

@@ -39,11 +39,11 @@ interface ProjectFormData {
   address: string;
   city: string;
   country: string;
-  fundingGoal: string;
+  loanAmount: string;
   minInvestment: string;
-  expectedReturn: string;
-  loanTermMonths: string;
-  ltvRatio: string;
+  currency: string;
+  constructionStartDate: string;
+  constructionEndDate: string;
 }
 
 type ProjectFormErrors = {
@@ -63,11 +63,11 @@ export default function EditProjectPage() {
     address: "",
     city: "",
     country: "",
-    fundingGoal: "",
+    loanAmount: "",
     minInvestment: "",
-    expectedReturn: "",
-    loanTermMonths: "",
-    ltvRatio: "",
+    currency: "USD",
+    constructionStartDate: "",
+    constructionEndDate: "",
   });
   const [errors, setErrors] = useState<ProjectFormErrors>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -110,11 +110,11 @@ export default function EditProjectPage() {
             address: p.address || "",
             city: p.city || "",
             country: p.country || "",
-            fundingGoal: p.funding_goal.toString(),
+            loanAmount: p.loan_amount.toString(),
             minInvestment: p.min_investment.toString(),
-            expectedReturn: p.expected_return.toString(),
-            loanTermMonths: p.loan_term_months.toString(),
-            ltvRatio: p.ltv_ratio?.toString() || "",
+            currency: p.currency || "USD",
+            constructionStartDate: p.construction_start_date || "",
+            constructionEndDate: p.construction_end_date || "",
           });
 
           // Fetch photos
@@ -151,11 +151,11 @@ export default function EditProjectPage() {
     if (!formData.address.trim()) newErrors.address = "Address is required";
     if (!formData.city.trim()) newErrors.city = "City is required";
     if (!formData.country.trim()) newErrors.country = "Country is required";
-    if (!formData.fundingGoal) newErrors.fundingGoal = "Funding goal is required";
+    if (!formData.loanAmount) newErrors.loanAmount = "Loan amount is required";
     if (!formData.minInvestment) newErrors.minInvestment = "Minimum investment is required";
-    if (!formData.expectedReturn) newErrors.expectedReturn = "Expected return is required";
-    if (!formData.loanTermMonths) newErrors.loanTermMonths = "Loan term is required";
-    if (!formData.ltvRatio) newErrors.ltvRatio = "LTV ratio is required";
+    if (!formData.currency) newErrors.currency = "Currency is required";
+    if (!formData.constructionStartDate) newErrors.constructionStartDate = "Construction start date is required";
+    if (!formData.constructionEndDate) newErrors.constructionEndDate = "Construction end date is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -243,11 +243,11 @@ export default function EditProjectPage() {
         address: formData.address,
         city: formData.city,
         country: formData.country,
-        funding_goal: parseFloat(formData.fundingGoal),
+        loan_amount: parseFloat(formData.loanAmount),
         min_investment: parseFloat(formData.minInvestment),
-        expected_return: parseFloat(formData.expectedReturn),
-        loan_term_months: parseInt(formData.loanTermMonths),
-        ltv_ratio: parseFloat(formData.ltvRatio),
+        currency: formData.currency,
+        construction_start_date: formData.constructionStartDate,
+        construction_end_date: formData.constructionEndDate,
       };
 
       const response = await projectsService.update(projectId, updateData);
@@ -501,24 +501,24 @@ export default function EditProjectPage() {
           </p>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="fundingGoal">Funding Goal ($) *</Label>
+                <Label htmlFor="loanAmount">Loan Amount *</Label>
                 <Input
-                  id="fundingGoal"
+                  id="loanAmount"
                   type="number"
-                  placeholder="e.g., 2500000"
-                  value={formData.fundingGoal}
-                  onChange={(e) => updateFormData("fundingGoal", e.target.value)}
-                  className={errors.fundingGoal ? "border-red-500" : ""}
+                  placeholder="e.g., 5000000"
+                  value={formData.loanAmount}
+                  onChange={(e) => updateFormData("loanAmount", e.target.value)}
+                  className={errors.loanAmount ? "border-red-500" : ""}
                 />
-                {errors.fundingGoal && (
-                  <p className="text-sm text-red-500 mt-1">{errors.fundingGoal}</p>
+                {errors.loanAmount && (
+                  <p className="text-sm text-red-500 mt-1">{errors.loanAmount}</p>
                 )}
               </div>
 
               <div>
-                <Label htmlFor="minInvestment">Minimum Investment ($) *</Label>
+                <Label htmlFor="minInvestment">Minimum Investment *</Label>
                 <Input
                   id="minInvestment"
                   type="number"
@@ -531,61 +531,63 @@ export default function EditProjectPage() {
                   <p className="text-sm text-red-500 mt-1">{errors.minInvestment}</p>
                 )}
               </div>
+
+              <div>
+                <Label htmlFor="currency">Currency *</Label>
+                <select
+                  id="currency"
+                  value={formData.currency}
+                  onChange={(e) => updateFormData("currency", e.target.value)}
+                  className={cn(
+                    "w-full px-3 py-2 border rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#E86A33]",
+                    errors.currency ? "border-red-500" : "border-input"
+                  )}
+                >
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="GBP">GBP - British Pound</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="AUD">AUD - Australian Dollar</option>
+                </select>
+                {errors.currency && (
+                  <p className="text-sm text-red-500 mt-1">{errors.currency}</p>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="expectedReturn">Expected Return (%) *</Label>
+                <Label htmlFor="constructionStartDate">Construction Start Date *</Label>
                 <Input
-                  id="expectedReturn"
-                  type="number"
-                  step="0.1"
-                  placeholder="e.g., 12"
-                  value={formData.expectedReturn}
-                  onChange={(e) => updateFormData("expectedReturn", e.target.value)}
-                  className={errors.expectedReturn ? "border-red-500" : ""}
+                  id="constructionStartDate"
+                  type="date"
+                  value={formData.constructionStartDate}
+                  onChange={(e) => updateFormData("constructionStartDate", e.target.value)}
+                  className={errors.constructionStartDate ? "border-red-500" : ""}
                 />
-                {errors.expectedReturn && (
-                  <p className="text-sm text-red-500 mt-1">{errors.expectedReturn}</p>
+                {errors.constructionStartDate && (
+                  <p className="text-sm text-red-500 mt-1">{errors.constructionStartDate}</p>
                 )}
               </div>
 
               <div>
-                <Label htmlFor="loanTermMonths">Loan Term (months) *</Label>
+                <Label htmlFor="constructionEndDate">Construction End Date *</Label>
                 <Input
-                  id="loanTermMonths"
-                  type="number"
-                  placeholder="e.g., 24"
-                  value={formData.loanTermMonths}
-                  onChange={(e) => updateFormData("loanTermMonths", e.target.value)}
-                  className={errors.loanTermMonths ? "border-red-500" : ""}
+                  id="constructionEndDate"
+                  type="date"
+                  value={formData.constructionEndDate}
+                  onChange={(e) => updateFormData("constructionEndDate", e.target.value)}
+                  className={errors.constructionEndDate ? "border-red-500" : ""}
                 />
-                {errors.loanTermMonths && (
-                  <p className="text-sm text-red-500 mt-1">{errors.loanTermMonths}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="ltvRatio">LTV Ratio (%) *</Label>
-                <Input
-                  id="ltvRatio"
-                  type="number"
-                  step="0.1"
-                  placeholder="e.g., 70"
-                  value={formData.ltvRatio}
-                  onChange={(e) => updateFormData("ltvRatio", e.target.value)}
-                  className={errors.ltvRatio ? "border-red-500" : ""}
-                />
-                {errors.ltvRatio && (
-                  <p className="text-sm text-red-500 mt-1">{errors.ltvRatio}</p>
+                {errors.constructionEndDate && (
+                  <p className="text-sm text-red-500 mt-1">{errors.constructionEndDate}</p>
                 )}
               </div>
             </div>
 
             <div className="p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-700">
-                <strong>LTV Ratio (Loan-to-Value):</strong> The loan amount as a percentage of the property&apos;s value.
-                Lower LTV means lower risk for lenders. Industry standard is typically 65-80%.
+                <strong>Construction Timeline:</strong> Provide accurate start and end dates for your construction project.
+                This helps lenders understand the project duration and plan their investment accordingly.
               </p>
             </div>
           </div>
