@@ -66,8 +66,8 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
   };
 
   return (
-    <Card className="overflow-hidden shadow-none border-none">
-      <CardContent className="space-y-3">
+    <Card className="overflow-hidden shadow-none border-none h-full">
+      <CardContent className="flex flex-col h-full gap-3">
         <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
           {project.coverImageUrl ? (
             <Image
@@ -85,7 +85,7 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
           {getStatusBadge()}
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-sm">
               {project.name} | {project.location}
@@ -112,7 +112,7 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
           </div>
         </div>
 
-        <Link href={`/dashboard/marketplace/${project.id}`}>
+        <Link href={`/dashboard/marketplace/${project.id}`} className="mt-auto">
           <Button className="w-full bg-[#E86A33] hover:bg-[#d55a23] text-white text-sm">
             View Details
           </Button>
