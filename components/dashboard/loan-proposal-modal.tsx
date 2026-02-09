@@ -50,8 +50,6 @@ const securityPackageOptions = [
   { id: "mortgage", label: "Mortgage" },
   { id: "spv_charge", label: "SPV Charge" },
   { id: "guarantees", label: "Guarantees" },
-  { id: "personal_guarantee", label: "Personal Guarantee" },
-  { id: "corporate_guarantee", label: "Corporate Guarantee" },
 ];
 
 export function LoanProposalModal({
@@ -390,7 +388,7 @@ export function LoanProposalModal({
           {/* Document Upload */}
           <div className="space-y-2">
             <Label>
-              Supporting Documents <span className="text-gray-400">(optional)</span>
+              Loan Term Agreement <span className="text-gray-400">(optional)</span>
             </Label>
             <p className="text-xs text-gray-500">
               Upload loan term agreements, bank statements, or other relevant documents
@@ -466,45 +464,6 @@ export function LoanProposalModal({
               onChange={handleInputChange}
               rows={3}
             />
-          </div>
-
-          {/* Note Section */}
-          <div className="space-y-4 pt-2">
-            <p className="text-sm font-semibold text-gray-900">
-              Note: All the values are based on the current exchange rate.
-            </p>
-
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="terms"
-                checked={termsAccepted}
-                onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-                className="mt-0.5"
-              />
-              <label htmlFor="terms" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
-                I understand Libelit AUS -{" "}
-                <a href="/terms" className="font-semibold hover:underline">Terms & Conditions</a>,{" "}
-                <a href="/pds" className="font-semibold hover:underline">Product Disclosure Statement</a>{" "}
-                and{" "}
-                <a href="/fsg" className="font-semibold hover:underline">Financial Service Guide</a>{" "}
-                (ASIC Regulated).
-              </label>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="privacy"
-                checked={privacyAccepted}
-                onCheckedChange={(checked) => setPrivacyAccepted(checked === true)}
-                className="mt-0.5"
-              />
-              <label htmlFor="privacy" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
-                I acknowledge that my information will be used in accordance with the{" "}
-                <a href="/privacy" className="font-semibold hover:underline">Privacy Policy</a>{" "}
-                and{" "}
-                <a href="/cookies" className="font-semibold hover:underline">Cookie Policy</a>.
-              </label>
-            </div>
           </div>
         </form>
 

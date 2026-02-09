@@ -97,10 +97,10 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
         </div>
 
         <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Requested Loan Amount</span>
           <span className="text-sm font-bold text-[#E86A33]">
             {formatPrice(project.loanValue)}
           </span>
-          <span className="text-xs text-muted-foreground">Requested Loan Amount</span>
         </div>
 
         <div className="space-y-1 text-xs">

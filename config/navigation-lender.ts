@@ -9,7 +9,7 @@ import {
   Layout,
   ShieldCheck,
   FileText,
-  LucideIcon,
+  LucideIcon, FolderKanban,
 } from "lucide-react";
 
 export interface NavItem {
@@ -30,13 +30,13 @@ export const lenderNavigationConfig: NavGroup[] = [
       { title: "Wallet", href: "/dashboard/wallet", icon: Wallet },
       { title: "Marketplace", href: "/dashboard/marketplace", icon: Store },
       { title: "My Proposals", href: "/dashboard/proposals", icon: FileText },
-      { title: "Portfolio", href: "/dashboard/portfolio", icon: PieChart },
-      { title: "Drawdown", href: "/dashboard/drawdown", icon: TrendingDown },
+      { title: "Deals", href: "/dashboard/deals", icon: PieChart },
+      { title: "Drawdown", href: "/dashboard/drawdown", icon: FolderKanban },
     ],
   },
   {
     items: [
-      { title: "Know-how", href: "/dashboard/know-how", icon: BookOpen },
+      // { title: "Know-how", href: "/dashboard/know-how", icon: BookOpen },
       { title: "Settings", href: "/dashboard/settings", icon: Settings },
       { title: "Landing page", href: "/", icon: Layout },
     ],
