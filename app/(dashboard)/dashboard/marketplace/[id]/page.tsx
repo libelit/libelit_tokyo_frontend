@@ -4,12 +4,11 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, ChevronLeft, ChevronRight, ArrowRight, X, XCircle, Loader2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, ChevronLeft, ChevronRight, ArrowRight, X, XCircle, Loader2, ExternalLink, BadgeCheck, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoanProposalModal, LoanProposalFormData } from "@/components/dashboard/loan-proposal-modal";
-import { loanProposalsService, LoanProposal, SecurityPackageType } from "@/lib/api/loan-proposals";
-import { lenderProjectsService } from "@/lib/api";
-import type { LenderProject } from "@/lib/types/lender";
+import { lenderProjectsService, lenderProposalsService } from "@/lib/api";
+import type { LenderProject, LenderLoanProposal, LenderSecurityPackageType } from "@/lib/types/lender";
 import { toast } from "sonner";
 
 // Hardcoded data for fields not available in API
@@ -17,11 +16,6 @@ const hardcodedData = {
   ltv: "60%",
   loanType: "Construction",
   loanMaturity: "30 Oct 2024", // Fallback if not calculated
-  team: {
-    name: "Project Developer",
-    role: "Contractor",
-    bio: "Experienced developer with a track record of successful real estate projects.",
-  },
   locationDescription: "This development is strategically located with easy access to public transportation, schools, shopping centers, and recreational facilities. The neighborhood is known for its family-friendly atmosphere and growing community.",
 };
 
@@ -48,6 +42,7 @@ export default function ProjectDetailsPage() {
   const galleryRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLDivElement>(null);
   const documentsRef = useRef<HTMLDivElement>(null);
+  const milestonesRef = useRef<HTMLDivElement>(null);
 
   // Active tab state
   const [activeTab, setActiveTab] = useState("about");
@@ -63,11 +58,8 @@ export default function ProjectDetailsPage() {
   const [progressImageIndex, setProgressImageIndex] = useState(0);
 
   // Proposal state
-  const [proposal, setProposal] = useState<LoanProposal | null>(null);
+  const [proposal, setProposal] = useState<LenderLoanProposal | null>(null);
   const [isLoadingProposal, setIsLoadingProposal] = useState(true);
-
-  // Mock lender ID - in real app this would come from auth context
-  const MOCK_LENDER_ID = "lender-1";
 
   // Fetch project data (includes documents, milestones, photos inline)
   const fetchProject = useCallback(async () => {
@@ -99,10 +91,16 @@ export default function ProjectDetailsPage() {
     if (!projectId) return;
     setIsLoadingProposal(true);
     try {
-      const result = await loanProposalsService.getByProjectAndLender(projectId.toString(), MOCK_LENDER_ID);
-      if (result?.success && result.data) {
-        setProposal(result.data);
-        setProposalSubmitted(true);
+      // Fetch all proposals and find if one exists for this project
+      const response = await lenderProposalsService.list({ status: "all", per_page: 100 });
+      if (response.data?.success && response.data.data) {
+        const existingProposal = response.data.data.find(
+          (p) => p.project.id === projectId
+        );
+        if (existingProposal) {
+          setProposal(existingProposal);
+          setProposalSubmitted(true);
+        }
       }
     } catch (error) {
       console.error("Error fetching proposal:", error);
@@ -148,29 +146,25 @@ export default function ProjectDetailsPage() {
   const handleLoanProposalSubmit = async (data: LoanProposalFormData) => {
     if (!project) return;
     try {
-      const response = await loanProposalsService.create(
-        {
-          projectId: project.id.toString(),
-          amountOffered: parseFloat(data.amountOffered),
-          currency: data.currency,
-          interestRate: parseFloat(data.interestRate),
-          maturityDate: data.maturityDate,
-          securityPackage: data.securityPackage as SecurityPackageType[],
-          maxLTV: parseFloat(data.maxLTV),
-          bidExpiry: data.bidExpiry,
-          conditions: data.conditions || undefined,
-        },
-        MOCK_LENDER_ID,
-        "First National Bank",
-        data.documents
-      );
+      const response = await lenderProposalsService.create({
+        project_id: project.id,
+        loan_amount_offered: parseFloat(data.amountOffered),
+        currency: data.currency,
+        interest_rate: parseFloat(data.interestRate),
+        loan_maturity_date: data.maturityDate,
+        security_packages: data.securityPackage as LenderSecurityPackageType[],
+        max_ltv_accepted: parseFloat(data.maxLTV),
+        bid_expiry_date: data.bidExpiry,
+        additional_conditions: data.conditions || undefined,
+        loan_term_agreement: data.documents?.[0], // First document as loan term agreement
+      });
 
-      if (response.success) {
-        setProposal(response.data);
+      if (response.data?.success) {
+        setProposal(response.data.data);
         setProposalSubmitted(true);
-        toast.success("Loan proposal submitted successfully");
-      } else {
-        toast.error(response.message || "Failed to submit proposal");
+        toast.success(response.data.message || "Loan proposal submitted successfully");
+      } else if (response.error) {
+        toast.error(response.error);
       }
     } catch (error) {
       console.error("Error submitting proposal:", error);
@@ -180,10 +174,11 @@ export default function ProjectDetailsPage() {
 
   const tabs = [
     { id: "about", label: "About project", ref: aboutRef },
-    { id: "team", label: "Project team", ref: teamRef },
+    { id: "team", label: "Developer Details", ref: teamRef },
     { id: "gallery", label: "Project gallery", ref: galleryRef },
     { id: "location", label: "Location", ref: locationRef },
     { id: "documents", label: "Documentation", ref: documentsRef },
+    { id: "milestones", label: "Milestones", ref: milestonesRef },
   ];
 
   const scrollToSection = (tabId: string, ref: React.RefObject<HTMLDivElement | null>) => {
@@ -482,27 +477,83 @@ export default function ProjectDetailsPage() {
           </div>
         </div>
 
-        {/* Project Team Section */}
+        {/* Developer Details Section */}
         <div ref={teamRef} className="scroll-mt-20">
-          <h3 className="text-lg font-semibold mb-4">Project team</h3>
+          <h3 className="text-lg font-semibold mb-4">Developer Details</h3>
           <div className="rounded-xl bg-white p-6">
-            <div className="flex items-start gap-4">
-              {/* Team Member Avatar */}
-              <div className="flex-shrink-0 w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
-                <User className="h-8 w-8 text-gray-400" />
-              </div>
-
-              {/* Team Member Info */}
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className="font-semibold">{hardcodedData.team.name}</h4>
-                  <span className="text-sm text-gray-500">| {hardcodedData.team.role}</span>
+            {project.developer ? (
+              <div className="flex items-start gap-4">
+                {/* Developer Avatar */}
+                <div className="flex-shrink-0 w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                  {project.developer.user?.avatar ? (
+                    <Image
+                      src={project.developer.user.avatar}
+                      alt={project.developer.user.name || "Developer"}
+                      width={64}
+                      height={64}
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <User className="h-8 w-8 text-gray-400" />
+                  )}
                 </div>
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  {hardcodedData.team.bio}
-                </p>
+
+                {/* Developer Info */}
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-semibold">
+                      {project.developer.company_name || project.developer.user?.name || "Developer"}
+                    </h4>
+                    {project.developer.kyb_status === "approved" && (
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                        <BadgeCheck className="h-3 w-3" />
+                        Verified
+                      </div>
+                    )}
+                  </div>
+
+                  {project.developer.user?.name && project.developer.company_name && (
+                    <p className="text-sm text-gray-600 mb-2">
+                      Contact: {project.developer.user.name}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                    {project.developer.user?.email && (
+                      <div className="flex items-center gap-1">
+                        <Mail className="h-4 w-4" />
+                        <span>{project.developer.user.email}</span>
+                      </div>
+                    )}
+                    {project.developer.user?.phone && (
+                      <div className="flex items-center gap-1">
+                        <Phone className="h-4 w-4" />
+                        <span>{project.developer.user.phone}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {project.developer.address && (
+                    <div className="flex items-center gap-1 text-sm text-gray-500 mt-2">
+                      <MapPin className="h-4 w-4" />
+                      <span>{project.developer.address}</span>
+                    </div>
+                  )}
+
+                  {project.developer.company_registration_number && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      Registration No: {project.developer.company_registration_number}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <User className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm">Developer information not available</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -659,11 +710,11 @@ export default function ProjectDetailsPage() {
           </div>
         </div>
 
-        {/* Milestones Section (if available) */}
-        {project.milestones && project.milestones.length > 0 && (
-          <div className="scroll-mt-20">
-            <h3 className="text-lg font-semibold mb-4">Project Milestones ({project.milestones_count})</h3>
-            <div className="rounded-xl border bg-white p-6 shadow-sm">
+        {/* Milestones Section */}
+        <div ref={milestonesRef} className="scroll-mt-20">
+          <h3 className="text-lg font-semibold mb-4">Project Milestones {project.milestones_count > 0 && `(${project.milestones_count})`}</h3>
+          <div className="rounded-xl border bg-white p-6 shadow-sm">
+            {project.milestones && project.milestones.length > 0 ? (
               <div className="space-y-4">
                 {project.milestones.map((milestone, index) => (
                   <div
@@ -698,9 +749,14 @@ export default function ProjectDetailsPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm">No milestones available for this project yet.</p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* VR Tour Modal */}

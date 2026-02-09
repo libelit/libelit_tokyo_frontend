@@ -54,6 +54,8 @@ export type {
   LenderProposalProject,
   LenderProposalListResponse,
   LenderProposalResponse,
+  CreateLenderProposalRequest,
+  CreateLenderProposalResponse,
 } from "./lender";
 
 export {

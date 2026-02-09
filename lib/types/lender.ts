@@ -367,3 +367,23 @@ export const lenderProposalStatusConfig: Record<LenderProposalStatus, { label: s
   rejected: { label: 'Rejected', color: 'text-red-700', bgColor: 'bg-red-50' },
   expired: { label: 'Expired', color: 'text-gray-700', bgColor: 'bg-gray-100' },
 };
+
+// Create Loan Proposal Request
+export interface CreateLenderProposalRequest {
+  project_id: number;
+  loan_amount_offered: number;
+  currency: string;
+  interest_rate: number;
+  loan_maturity_date: string;
+  security_packages: LenderSecurityPackageType[];
+  max_ltv_accepted: number;
+  bid_expiry_date: string;
+  additional_conditions?: string;
+  loan_term_agreement?: File;
+}
+
+export interface CreateLenderProposalResponse {
+  success: boolean;
+  message: string;
+  data: LenderLoanProposal;
+}

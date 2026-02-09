@@ -76,8 +76,6 @@ export function LoanProposalModal({
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -151,8 +149,6 @@ export function LoanProposalModal({
     });
     setSecurityPackage([]);
     setDocuments([]);
-    setTermsAccepted(false);
-    setPrivacyAccepted(false);
     setIsSubmitted(false);
   };
 
@@ -182,9 +178,7 @@ export function LoanProposalModal({
     formData.maturityDate &&
     securityPackage.length > 0 &&
     formData.maxLTV &&
-    formData.bidExpiry &&
-    termsAccepted &&
-    privacyAccepted;
+    formData.bidExpiry;
 
   // Success State
   if (isSubmitted) {
@@ -465,6 +459,7 @@ export function LoanProposalModal({
               rows={3}
             />
           </div>
+
         </form>
 
         <DialogFooter className="gap-3">

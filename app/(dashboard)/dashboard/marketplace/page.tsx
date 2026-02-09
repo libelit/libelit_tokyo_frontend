@@ -6,15 +6,10 @@ import { ProjectCard, Project as CardProject } from "@/components/dashboard/proj
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, SlidersHorizontal, AlertCircle, Loader2, Building2 } from "lucide-react";
-import { loanProposalsService } from "@/lib/api/loan-proposals";
-import { lenderProfileService, lenderProjectsService } from "@/lib/api";
-import { ProposalStatus } from "@/lib/types/loan-proposal";
-import type { LenderProfile, KybStatus, LenderProject } from "@/lib/types/lender";
+import { lenderProfileService, lenderProjectsService, lenderProposalsService } from "@/lib/api";
+import type { LenderProfile, KybStatus, LenderProject, LenderProposalStatus } from "@/lib/types/lender";
 import Link from "next/link";
 import { toast } from "sonner";
-
-// Mock lender ID - in real app this would come from auth context
-const MOCK_LENDER_ID = "lender-1";
 
 // Helper function to calculate loan duration in days from construction dates
 function calculateLoanDuration(startDate: string | null, endDate: string | null): number {
@@ -110,7 +105,7 @@ function KybBlockedMessage({ kybStatus }: { kybStatus: KybStatus }) {
 
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [proposalStatuses, setProposalStatuses] = useState<Record<string, ProposalStatus>>({});
+  const [proposalStatuses, setProposalStatuses] = useState<Record<string, LenderProposalStatus>>({});
   const [profile, setProfile] = useState<LenderProfile | null>(null);
   const [projects, setProjects] = useState<LenderProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -181,11 +176,11 @@ export default function MarketplacePage() {
   // Fetch proposal statuses for all projects
   const fetchProposalStatuses = useCallback(async () => {
     try {
-      const response = await loanProposalsService.getByLender(MOCK_LENDER_ID);
-      if (response.success) {
-        const statuses: Record<string, ProposalStatus> = {};
-        response.data.forEach((proposal) => {
-          statuses[proposal.projectId] = proposal.status;
+      const response = await lenderProposalsService.list({ status: "all", per_page: 100 });
+      if (response.data?.success) {
+        const statuses: Record<string, LenderProposalStatus> = {};
+        response.data.data.forEach((proposal) => {
+          statuses[proposal.project.id.toString()] = proposal.status;
         });
         setProposalStatuses(statuses);
       }

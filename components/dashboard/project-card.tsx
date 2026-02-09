@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { ProposalStatus } from "@/lib/types/loan-proposal";
+import { LenderProposalStatus } from "@/lib/types/lender";
 
 export interface Project {
   id: string;
@@ -17,7 +17,7 @@ export interface Project {
 
 interface ProjectCardProps {
   project: Project;
-  proposalStatus?: ProposalStatus | null;
+  proposalStatus?: LenderProposalStatus | null;
 }
 
 export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
@@ -52,12 +52,19 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
             Rejected
           </div>
         );
-      case "submitted":
+      case "submitted_by_lender":
       case "under_review":
         return (
           <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded-full">
             <Clock className="h-3 w-3" />
             Pending
+          </div>
+        );
+      case "expired":
+        return (
+          <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-gray-500 text-white text-xs font-medium rounded-full">
+            <Clock className="h-3 w-3" />
+            Expired
           </div>
         );
       default:

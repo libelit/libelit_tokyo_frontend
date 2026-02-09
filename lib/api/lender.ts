@@ -13,6 +13,8 @@ import {
   LenderProjectResponse,
   LenderProposalListResponse,
   LenderProposalResponse,
+  CreateLenderProposalRequest,
+  CreateLenderProposalResponse,
 } from "../types/lender";
 import {
   ProjectDocumentsResponse,
@@ -164,5 +166,35 @@ export const lenderProposalsService = {
 
   async get(id: number): Promise<ApiResponse<LenderProposalResponse>> {
     return apiClient.get<LenderProposalResponse>(`/lender/loan-proposals/${id}`);
+  },
+
+  async create(data: CreateLenderProposalRequest): Promise<ApiResponse<CreateLenderProposalResponse>> {
+    const formData = new FormData();
+
+    formData.append("project_id", data.project_id.toString());
+    formData.append("loan_amount_offered", data.loan_amount_offered.toString());
+    formData.append("currency", data.currency);
+    formData.append("interest_rate", data.interest_rate.toString());
+    formData.append("loan_maturity_date", data.loan_maturity_date);
+    formData.append("max_ltv_accepted", data.max_ltv_accepted.toString());
+    formData.append("bid_expiry_date", data.bid_expiry_date);
+
+    // Append security packages as array
+    data.security_packages.forEach((pkg) => {
+      formData.append("security_packages[]", pkg);
+    });
+
+    if (data.additional_conditions) {
+      formData.append("additional_conditions", data.additional_conditions);
+    }
+
+    if (data.loan_term_agreement) {
+      formData.append("loan_term_agreement", data.loan_term_agreement);
+    }
+
+    return apiClient.upload<CreateLenderProposalResponse>(
+      "/lender/loan-proposals",
+      formData
+    );
   },
 };
