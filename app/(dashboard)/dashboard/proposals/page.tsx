@@ -9,11 +9,20 @@ import {
   Clock,
   AlertCircle,
   Filter,
+  PenTool,
 } from "lucide-react";
 import { LenderProposalCard } from "@/components/dashboard/lender-proposal-card";
 import { lenderProposalsService } from "@/lib/api";
-import { LenderLoanProposal, LenderProposalStatus } from "@/lib/types/lender";
+import type { LenderLoanProposal, LenderProposalStatus } from "@/lib/types/lender";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 type StatusFilter = "all" | LenderProposalStatus;
@@ -29,6 +38,10 @@ export default function MyProposalsPage() {
     total: 0,
   });
 
+  // Sign state
+  const [signingId, setSigningId] = useState<number | null>(null);
+  const [showSignDialog, setShowSignDialog] = useState<number | null>(null);
+
   const fetchProposals = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -38,8 +51,6 @@ export default function MyProposalsPage() {
       });
       if (response.data?.success) {
         setProposals(response.data.data);
-        console.log('backend response: ',response.data.data);
-
         setMeta(response.data.meta);
       } else if (response.error) {
         toast.error(response.error);
@@ -56,31 +67,58 @@ export default function MyProposalsPage() {
     fetchProposals();
   }, [fetchProposals]);
 
+  const handleSign = async (proposalId: number) => {
+    setSigningId(proposalId);
+    try {
+      const response = await lenderProposalsService.sign(proposalId);
+      if (response.data?.success) {
+        toast.success("Agreement signed successfully");
+        setShowSignDialog(null);
+        await fetchProposals();
+      } else {
+        toast.error(response.data?.message || response.error || "Failed to sign agreement");
+      }
+    } catch (error) {
+      console.error("Error signing agreement:", error);
+      toast.error("Failed to sign agreement");
+    } finally {
+      setSigningId(null);
+    }
+  };
+
+  // Helper to check if a proposal is in accepted/active state (for signing flow)
+  const isAcceptedOrActive = (p: LenderLoanProposal) => {
+    return p.status === "accepted_by_developer" ||
+           p.status === "signed_by_developer" ||
+           p.status === "signed_by_lender" ||
+           p.status === "loan_term_fully_executed";
+  };
+
   // Calculate stats from proposals
   const stats = {
     total: meta.total,
     pending: proposals.filter(
-      (p) => p.status === "submitted_by_lender" || p.status === "under_review"
+      (p) => p.status === "submitted_by_lender" || p.status === "under_review_by_developer"
     ).length,
-    accepted: proposals.filter((p) => p.status === "accepted").length,
-    rejected: proposals.filter((p) => p.status === "rejected").length,
+    accepted: proposals.filter(isAcceptedOrActive).length,
+    rejected: proposals.filter((p) => p.status === "rejected_by_developer").length,
   };
 
   // Group proposals by status for display
-  const acceptedProposals = proposals.filter((p) => p.status === "accepted");
+  const acceptedProposals = proposals.filter(isAcceptedOrActive);
   const pendingProposals = proposals.filter(
-    (p) => p.status === "submitted_by_lender" || p.status === "under_review"
+    (p) => p.status === "submitted_by_lender" || p.status === "under_review_by_developer"
   );
-  const rejectedProposals = proposals.filter((p) => p.status === "rejected");
-  const expiredProposals = proposals.filter((p) => p.status === "expired");
+  const rejectedProposals = proposals.filter((p) => p.status === "rejected_by_developer");
+  const fullyExecutedProposals = proposals.filter((p) => p.status === "loan_term_fully_executed");
 
   const filterOptions: { value: StatusFilter; label: string }[] = [
     { value: "all", label: "All" },
     { value: "submitted_by_lender", label: "Pending" },
-    { value: "under_review", label: "Under Review" },
-    { value: "accepted", label: "Accepted" },
-    { value: "rejected", label: "Rejected" },
-    { value: "expired", label: "Expired" },
+    { value: "under_review_by_developer", label: "Under Review" },
+    { value: "accepted_by_developer", label: "Accepted" },
+    { value: "rejected_by_developer", label: "Rejected" },
+    { value: "loan_term_fully_executed", label: "Active" },
   ];
 
   if (isLoading) {
@@ -177,7 +215,12 @@ export default function MyProposalsPage() {
               </h3>
               <div className="space-y-4">
                 {acceptedProposals.map((proposal) => (
-                  <LenderProposalCard key={proposal.id} proposal={proposal} />
+                  <LenderProposalCard
+                    key={proposal.id}
+                    proposal={proposal}
+                    onSign={(id) => setShowSignDialog(id)}
+                    isSigning={signingId === proposal.id}
+                  />
                 ))}
               </div>
             </div>
@@ -213,15 +256,15 @@ export default function MyProposalsPage() {
             </div>
           )}
 
-          {/* Expired Proposals */}
-          {expiredProposals.length > 0 && (
+          {/* Fully Executed Loans */}
+          {fullyExecutedProposals.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-gray-600 mb-3 uppercase tracking-wide flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Expired ({expiredProposals.length})
+              <h3 className="text-sm font-medium text-emerald-600 mb-3 uppercase tracking-wide flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                Active Loans ({fullyExecutedProposals.length})
               </h3>
               <div className="space-y-4">
-                {expiredProposals.map((proposal) => (
+                {fullyExecutedProposals.map((proposal) => (
                   <LenderProposalCard key={proposal.id} proposal={proposal} />
                 ))}
               </div>
@@ -232,7 +275,12 @@ export default function MyProposalsPage() {
         /* Filtered view */
         <div className="space-y-4">
           {proposals.map((proposal) => (
-            <LenderProposalCard key={proposal.id} proposal={proposal} />
+            <LenderProposalCard
+              key={proposal.id}
+              proposal={proposal}
+              onSign={isAcceptedOrActive(proposal) ? (id) => setShowSignDialog(id) : undefined}
+              isSigning={signingId === proposal.id}
+            />
           ))}
         </div>
       )}
@@ -258,11 +306,57 @@ export default function MyProposalsPage() {
         </h3>
         <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
           <li>Proposals are reviewed by developers within 2-5 business days</li>
-          <li>If accepted, you&apos;ll need to upload your signed contract</li>
-          <li>The loan becomes active once both parties sign the contract</li>
+          <li>If accepted, you&apos;ll need to sign the loan agreement</li>
+          <li>The loan becomes active once both parties sign the agreement</li>
           <li>Rejected proposals show the reason provided by the developer</li>
         </ul>
       </div>
+
+      {/* Sign Agreement Dialog */}
+      <Dialog open={!!showSignDialog} onOpenChange={() => setShowSignDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PenTool className="h-5 w-5 text-[#E86A33]" />
+              Sign Loan Agreement
+            </DialogTitle>
+            <DialogDescription>
+              By signing, you agree to the terms and conditions of this loan agreement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="my-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+            <p className="text-sm text-amber-800">
+              <strong>Important:</strong> This is a legally binding agreement. Please ensure you have reviewed all terms before signing.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowSignDialog(null)}
+              disabled={!!signingId}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => showSignDialog && handleSign(showSignDialog)}
+              disabled={!!signingId}
+              className="bg-[#E86A33] hover:bg-[#d55a25] text-white"
+            >
+              {signingId ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing...
+                </>
+              ) : (
+                <>
+                  <PenTool className="mr-2 h-4 w-4" />
+                  Sign Agreement
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

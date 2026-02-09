@@ -1504,7 +1504,7 @@ export default function ProjectDetailsPage() {
       )}
 
       {activeTab === "proposals" && (
-        <ProjectProposalsTab projectId={String(2)} />
+        <ProjectProposalsTab projectId={String(projectId)} />
       )}
     </div>
   );

@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FileText, Loader2, CheckCircle2, XCircle, AlertCircle, Upload, Circle } from "lucide-react";
+import { FileText, Loader2, CheckCircle2, XCircle, AlertCircle, PenTool } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -15,8 +14,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ProposalCard } from "./proposal-card";
-import { loanProposalsService } from "@/lib/api/loan-proposals";
-import { LoanProposal } from "@/lib/types/loan-proposal";
+import { projectProposalsService } from "@/lib/api";
+import { DeveloperProjectProposal } from "@/lib/types/developer";
 import { toast } from "sonner";
 
 interface ProjectProposalsTabProps {
@@ -24,30 +23,31 @@ interface ProjectProposalsTabProps {
 }
 
 export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
-  const [proposals, setProposals] = useState<LoanProposal[]>([]);
+  const [proposals, setProposals] = useState<DeveloperProjectProposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({ total: 0, pending: 0, accepted: 0, rejected: 0 });
+  const [totalProposals, setTotalProposals] = useState(0);
 
-  // Accept/Reject state
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [showAcceptDialog, setShowAcceptDialog] = useState<string | null>(null);
-  const [showRejectDialog, setShowRejectDialog] = useState<string | null>(null);
+  // Accept/Reject/Sign state
+  const [acceptingId, setAcceptingId] = useState<number | null>(null);
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [signingId, setSigningId] = useState<number | null>(null);
+  const [showAcceptDialog, setShowAcceptDialog] = useState<number | null>(null);
+  const [showRejectDialog, setShowRejectDialog] = useState<number | null>(null);
+  const [showSignDialog, setShowSignDialog] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
-
-  // Contract upload state
-  const [contractFile, setContractFile] = useState<File | null>(null);
-  const [isUploadingContract, setIsUploadingContract] = useState(false);
 
   const fetchProposals = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await loanProposalsService.getByProject(projectId);
-      if (response.success) {
-        setProposals(response.data);
-        if (response.meta) {
-          setStats(response.meta);
-        }
+      const response = await projectProposalsService.list(parseInt(projectId), {
+        status: "all",
+        per_page: 50,
+      });
+      if (response.data?.success) {
+        setProposals(response.data.data);
+        setTotalProposals(response.data.meta?.total || response.data.data.length);
+      } else if (response.error) {
+        toast.error("Failed to load proposals");
       }
     } catch (error) {
       console.error("Error fetching proposals:", error);
@@ -61,16 +61,16 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
     fetchProposals();
   }, [fetchProposals]);
 
-  const handleAccept = async (proposalId: string) => {
+  const handleAccept = async (proposalId: number) => {
     setAcceptingId(proposalId);
     try {
-      const response = await loanProposalsService.accept(proposalId);
-      if (response.success) {
+      const response = await projectProposalsService.accept(proposalId);
+      if (response.data?.success) {
         toast.success("Proposal accepted successfully");
         setShowAcceptDialog(null);
         await fetchProposals();
       } else {
-        toast.error(response.message || "Failed to accept proposal");
+        toast.error(response.data?.message || response.error || "Failed to accept proposal");
       }
     } catch (error) {
       console.error("Error accepting proposal:", error);
@@ -80,17 +80,20 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
     }
   };
 
-  const handleReject = async (proposalId: string) => {
+  const handleReject = async (proposalId: number) => {
     setRejectingId(proposalId);
     try {
-      const response = await loanProposalsService.reject(proposalId, rejectReason || undefined);
-      if (response.success) {
+      const response = await projectProposalsService.reject(
+        proposalId,
+        rejectReason || undefined
+      );
+      if (response.data?.success) {
         toast.success("Proposal rejected");
         setShowRejectDialog(null);
         setRejectReason("");
         await fetchProposals();
       } else {
-        toast.error(response.message || "Failed to reject proposal");
+        toast.error(response.data?.message || response.error || "Failed to reject proposal");
       }
     } catch (error) {
       console.error("Error rejecting proposal:", error);
@@ -100,37 +103,47 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
     }
   };
 
-  const handleContractUpload = async (proposalId: string) => {
-    if (!contractFile) return;
-
-    setIsUploadingContract(true);
+  const handleSign = async (proposalId: number) => {
+    setSigningId(proposalId);
     try {
-      const response = await loanProposalsService.uploadContract(
-        proposalId,
-        "developer",
-        contractFile.name
-      );
-      if (response.success) {
-        toast.success("Contract uploaded successfully");
-        setContractFile(null);
+      const response = await projectProposalsService.sign(proposalId);
+      if (response.data?.success) {
+        toast.success("Agreement signed successfully");
+        setShowSignDialog(null);
         await fetchProposals();
       } else {
-        toast.error(response.message || "Failed to upload contract");
+        toast.error(response.data?.message || response.error || "Failed to sign agreement");
       }
     } catch (error) {
-      console.error("Error uploading contract:", error);
-      toast.error("Failed to upload contract");
+      console.error("Error signing agreement:", error);
+      toast.error("Failed to sign agreement");
     } finally {
-      setIsUploadingContract(false);
+      setSigningId(null);
     }
   };
 
-  // Get the accepted proposal if any
-  const acceptedProposal = proposals.find((p) => p.status === "accepted");
+  // Helper to check if a proposal is in accepted/active state (for signing flow)
+  const isAcceptedOrActive = (p: DeveloperProjectProposal) => {
+    return p.status === "accepted_by_developer" ||
+           p.status === "signed_by_developer" ||
+           p.status === "signed_by_lender" ||
+           p.status === "loan_term_fully_executed";
+  };
+
+  // Calculate stats from proposals
+  const stats = {
+    total: totalProposals,
+    pending: proposals.filter((p) => p.status === "submitted_by_lender" || p.status === "under_review_by_developer").length,
+    accepted: proposals.filter(isAcceptedOrActive).length,
+    rejected: proposals.filter((p) => p.status === "rejected_by_developer").length,
+  };
+
+  // Group proposals by status
+  const acceptedProposals = proposals.filter(isAcceptedOrActive);
   const pendingProposals = proposals.filter(
-    (p) => p.status === "submitted" || p.status === "under_review"
+    (p) => p.status === "submitted_by_lender" || p.status === "under_review_by_developer"
   );
-  const rejectedProposals = proposals.filter((p) => p.status === "rejected");
+  const rejectedProposals = proposals.filter((p) => p.status === "rejected_by_developer");
 
   if (isLoading) {
     return (
@@ -168,135 +181,22 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
         </div>
       </div>
 
-      {/* Accepted Proposal Banner */}
-      {acceptedProposal && (
-        <div className="rounded-xl border-2 border-green-200 bg-green-50 p-6 space-y-4">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-green-800">Proposal Accepted</h3>
-              <p className="text-sm text-green-700 mt-1">
-                You accepted the proposal from <strong>{acceptedProposal.lenderName}</strong>.
-                {acceptedProposal.contractStatus === "pending" && (
-                  <span> Please proceed with uploading the signed contract.</span>
-                )}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-4 text-sm">
-                <div>
-                  <span className="text-green-600">Amount:</span>{" "}
-                  <span className="font-medium">
-                    {new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: acceptedProposal.currency,
-                      minimumFractionDigits: 0,
-                    }).format(acceptedProposal.amountOffered)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-green-600">Interest Rate:</span>{" "}
-                  <span className="font-medium">{acceptedProposal.interestRate}%</span>
-                </div>
-                <div>
-                  <span className="text-green-600">LTV:</span>{" "}
-                  <span className="font-medium">{acceptedProposal.maxLTV}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Contract Status & Upload */}
-          <div className="pt-4 border-t border-green-200">
-            <h4 className="font-medium text-green-800 mb-3">Contract Status</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Lender Contract */}
-              <div className={`p-4 rounded-lg border ${
-                acceptedProposal.lenderContract
-                  ? "bg-green-100 border-green-300"
-                  : "bg-white border-gray-200"
-              }`}>
-                <div className="flex items-center gap-2 mb-2">
-                  {acceptedProposal.lenderContract ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  ) : (
-                    <Circle className="h-5 w-5 text-gray-300" />
-                  )}
-                  <span className="font-medium">Lender&apos;s Contract</span>
-                </div>
-                {acceptedProposal.lenderContract ? (
-                  <div className="text-sm text-green-700">
-                    <p>{acceptedProposal.lenderContract.name}</p>
-                    <p className="text-xs mt-1">
-                      Signed on {new Date(acceptedProposal.lenderContract.signedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">Waiting for lender to sign</p>
-                )}
-              </div>
-
-              {/* Developer Contract */}
-              <div className={`p-4 rounded-lg border ${
-                acceptedProposal.developerContract
-                  ? "bg-green-100 border-green-300"
-                  : "bg-white border-gray-200"
-              }`}>
-                <div className="flex items-center gap-2 mb-2">
-                  {acceptedProposal.developerContract ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  ) : (
-                    <Circle className="h-5 w-5 text-gray-300" />
-                  )}
-                  <span className="font-medium">Your Signed Contract</span>
-                </div>
-                {acceptedProposal.developerContract ? (
-                  <div className="text-sm text-green-700">
-                    <p>{acceptedProposal.developerContract.name}</p>
-                    <p className="text-xs mt-1">
-                      Signed on {new Date(acceptedProposal.developerContract.signedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-500">Upload your signed contract</p>
-                    <div className="flex gap-2">
-                      <Input
-                        type="file"
-                        accept=".pdf"
-                        onChange={(e) => setContractFile(e.target.files?.[0] || null)}
-                        className="flex-1 text-sm"
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => handleContractUpload(acceptedProposal.id)}
-                        disabled={!contractFile || isUploadingContract}
-                        className="bg-[#E86A33] hover:bg-[#d55a25] text-white"
-                      >
-                        {isUploadingContract ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Contract Completed Message */}
-            {acceptedProposal.contractStatus === "completed" && (
-              <div className="mt-4 p-4 bg-green-100 rounded-lg border border-green-300">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <span className="font-medium text-green-800">Contract Signing Complete!</span>
-                </div>
-                <p className="text-sm text-green-700 mt-1">
-                  Both parties have signed the contract. The loan is now active.
-                </p>
-              </div>
-            )}
+      {/* Accepted Proposals */}
+      {acceptedProposals.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium text-green-600 mb-3 uppercase tracking-wide flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            Accepted ({acceptedProposals.length})
+          </h3>
+          <div className="space-y-4">
+            {acceptedProposals.map((proposal) => (
+              <ProposalCard
+                key={proposal.id}
+                proposal={proposal}
+                onSign={() => setShowSignDialog(proposal.id)}
+                isSigning={signingId === proposal.id}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -325,7 +225,8 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
       {/* Rejected Proposals */}
       {rejectedProposals.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wide">
+          <h3 className="text-sm font-medium text-red-600 mb-3 uppercase tracking-wide flex items-center gap-2">
+            <XCircle className="h-4 w-4" />
             Rejected ({rejectedProposals.length})
           </h3>
           <div className="space-y-4">
@@ -358,7 +259,7 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
           <li>Review each proposal carefully before making a decision</li>
           <li>Compare interest rates, LTV, and security packages</li>
           <li>Accepting a proposal will automatically reject all others</li>
-          <li>After acceptance, both parties need to sign the contract</li>
+          <li>After acceptance, both parties need to sign the agreement</li>
         </ul>
       </div>
 
@@ -378,7 +279,7 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
             <li>Accept the selected proposal</li>
             <li>Automatically reject all other pending proposals</li>
             <li>Notify the lender about acceptance</li>
-            <li>Move to the contract signing phase</li>
+            <li>Move to the agreement signing phase</li>
           </ul>
           <DialogFooter className="gap-2">
             <Button
@@ -452,6 +353,52 @@ export function ProjectProposalsTab({ projectId }: ProjectProposalsTabProps) {
                 </>
               ) : (
                 "Reject Proposal"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sign Agreement Dialog */}
+      <Dialog open={!!showSignDialog} onOpenChange={() => setShowSignDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PenTool className="h-5 w-5 text-[#E86A33]" />
+              Sign Loan Agreement
+            </DialogTitle>
+            <DialogDescription>
+              By signing, you agree to the terms and conditions of this loan agreement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="my-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+            <p className="text-sm text-amber-800">
+              <strong>Important:</strong> This is a legally binding agreement. Please ensure you have reviewed all terms before signing.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowSignDialog(null)}
+              disabled={!!signingId}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => showSignDialog && handleSign(showSignDialog)}
+              disabled={!!signingId}
+              className="bg-[#E86A33] hover:bg-[#d55a25] text-white"
+            >
+              {signingId ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing...
+                </>
+              ) : (
+                <>
+                  <PenTool className="mr-2 h-4 w-4" />
+                  Sign Agreement
+                </>
               )}
             </Button>
           </DialogFooter>

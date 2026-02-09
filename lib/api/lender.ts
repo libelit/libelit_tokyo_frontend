@@ -149,7 +149,7 @@ export const lenderProjectPhotosService = {
 // Lender Proposals Service
 export const lenderProposalsService = {
   async list(params?: {
-    status?: 'all' | 'submitted_by_lender' | 'under_review' | 'accepted' | 'rejected' | 'expired';
+    status?: 'all' | 'submitted_by_lender' | 'under_review_by_developer' | 'accepted_by_developer' | 'rejected_by_developer' | 'signed_by_developer' | 'signed_by_lender' | 'loan_term_fully_executed';
     per_page?: number;
     page?: number;
   }): Promise<ApiResponse<LenderProposalListResponse>> {
@@ -195,6 +195,13 @@ export const lenderProposalsService = {
     return apiClient.upload<CreateLenderProposalResponse>(
       "/lender/loan-proposals",
       formData
+    );
+  },
+
+  async sign(proposalId: number): Promise<ApiResponse<LenderProposalResponse>> {
+    return apiClient.patch<LenderProposalResponse>(
+      `/lender/loan-proposals/${proposalId}`,
+      { action: "sign" }
     );
   },
 };

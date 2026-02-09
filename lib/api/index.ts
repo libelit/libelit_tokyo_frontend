@@ -15,6 +15,9 @@ export {
   kybService,
   projectsService,
   projectDocumentsService,
+  milestonesService,
+  projectPhotosService,
+  projectProposalsService,
 } from "./developer";
 
 export {
@@ -26,5 +29,3 @@ export {
   lenderProjectPhotosService,
   lenderProposalsService,
 } from "./lender";
-
-export { loanProposalsService } from "./loan-proposals";

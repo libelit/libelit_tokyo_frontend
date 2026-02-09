@@ -246,10 +246,12 @@ export interface LenderProjectResponse {
 // Lender Loan Proposal Types
 export type LenderProposalStatus =
   | 'submitted_by_lender'
-  | 'under_review'
-  | 'accepted'
-  | 'rejected'
-  | 'expired';
+  | 'under_review_by_developer'
+  | 'accepted_by_developer'
+  | 'rejected_by_developer'
+  | 'signed_by_developer'
+  | 'signed_by_lender'
+  | 'loan_term_fully_executed';
 
 export type LenderSecurityPackageType =
   | 'mortgage'
@@ -362,10 +364,12 @@ export const lenderSecurityPackageLabels: Record<LenderSecurityPackageType, stri
 // Status Labels and Colors for display
 export const lenderProposalStatusConfig: Record<LenderProposalStatus, { label: string; color: string; bgColor: string }> = {
   submitted_by_lender: { label: 'Pending Review', color: 'text-amber-700', bgColor: 'bg-amber-50' },
-  under_review: { label: 'Under Review', color: 'text-blue-700', bgColor: 'bg-blue-50' },
-  accepted: { label: 'Accepted', color: 'text-green-700', bgColor: 'bg-green-50' },
-  rejected: { label: 'Rejected', color: 'text-red-700', bgColor: 'bg-red-50' },
-  expired: { label: 'Expired', color: 'text-gray-700', bgColor: 'bg-gray-100' },
+  under_review_by_developer: { label: 'Under Review', color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  accepted_by_developer: { label: 'Accepted', color: 'text-green-700', bgColor: 'bg-green-50' },
+  rejected_by_developer: { label: 'Rejected', color: 'text-red-700', bgColor: 'bg-red-50' },
+  signed_by_developer: { label: 'Developer Signed', color: 'text-green-700', bgColor: 'bg-green-50' },
+  signed_by_lender: { label: 'Lender Signed', color: 'text-green-700', bgColor: 'bg-green-50' },
+  loan_term_fully_executed: { label: 'Loan Active', color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
 };
 
 // Create Loan Proposal Request

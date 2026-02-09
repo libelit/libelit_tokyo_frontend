@@ -308,13 +308,13 @@ export default function ProjectDetailsPage() {
                   <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                   <span className="text-sm text-gray-500">Loading...</span>
                 </div>
-              ) : proposal?.status === "accepted" ? (
+              ) : (proposal?.status === "accepted_by_developer" || proposal?.status === "signed_by_developer" || proposal?.status === "signed_by_lender" || proposal?.status === "loan_term_fully_executed") ? (
                 <Link href="/dashboard/proposals" className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-full hover:bg-green-100 transition-colors">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <span className="text-sm font-medium text-green-700">Proposal Accepted</span>
                   <ExternalLink className="h-3.5 w-3.5 text-green-600" />
                 </Link>
-              ) : proposal?.status === "rejected" ? (
+              ) : proposal?.status === "rejected_by_developer" ? (
                 <Link href="/dashboard/proposals" className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 transition-colors">
                   <XCircle className="h-4 w-4 text-red-600" />
                   <span className="text-sm font-medium text-red-700">Proposal Rejected</span>

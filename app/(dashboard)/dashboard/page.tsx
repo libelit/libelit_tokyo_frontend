@@ -1,12 +1,20 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { ConnectWallet } from "@/components/dashboard/connect-wallet";
 import { StatsCards } from "@/components/dashboard/stats-cards";
 import { LoansChart } from "@/components/dashboard/loans-chart";
 import { PortfolioTable } from "@/components/dashboard/portfolio-table";
-import { ProjectCard } from "@/components/dashboard/project-card";
-import {Separator} from "@/components/ui/separator";
+import { ProjectCard, Project as CardProject } from "@/components/dashboard/project-card";
+import { Separator } from "@/components/ui/separator";
+import { lenderProjectsService, lenderProposalsService } from "@/lib/api";
+import type { LenderProject } from "@/lib/types/lender";
+import { Building2, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
-// Mock data - replace with real data from API later
+// Chart data - will be populated from API when available
 const chartData = [
   { date: "Jan", value: 0 },
   { date: "Feb", value: 0 },
@@ -16,17 +24,74 @@ const chartData = [
   { date: "Jun", value: 0 },
 ];
 
-const mockProject = {
-  id: "1",
-  name: "Project Name",
-  location: "City, Country",
-  description:
-    "Our investment features four semi-detached houses. Our investment features four semi-detached houses.",
-  loanValue: 1000000,
-  projectDuration: 216,
-};
+// Helper to map LenderProject to CardProject
+function mapToCardProject(project: LenderProject): CardProject {
+  const location = [project.city, project.country].filter(Boolean).join(", ") || "Location not set";
+  const startDate = project.construction_start_date ? new Date(project.construction_start_date) : new Date();
+  const endDate = project.construction_end_date ? new Date(project.construction_end_date) : new Date();
+  const projectDuration = Math.ceil(Math.abs(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) || 365;
+  const imageUrl = project.cover_photo_url || (project.photos?.[0]?.file_url);
+
+  return {
+    id: project.id.toString(),
+    name: project.title,
+    location,
+    description: project.description || "No description available",
+    loanValue: project.loan_amount,
+    projectDuration,
+    coverImageUrl: imageUrl || undefined,
+  };
+}
 
 export default function DashboardPage() {
+  const [latestProject, setLatestProject] = useState<CardProject | null>(null);
+  const [stats, setStats] = useState({ totalBalance: 0, submittedBids: 0, approvedLoans: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchDashboardData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Fetch latest project from marketplace
+      const projectsResponse = await lenderProjectsService.list({ per_page: 1 });
+      if (projectsResponse.data?.success && projectsResponse.data.data.length > 0) {
+        setLatestProject(mapToCardProject(projectsResponse.data.data[0]));
+      }
+
+      // Fetch proposals to calculate stats
+      const proposalsResponse = await lenderProposalsService.list({ status: "all", per_page: 100 });
+      if (proposalsResponse.data?.success) {
+        const proposals = proposalsResponse.data.data;
+        const submittedBids = proposals.filter(p =>
+          p.status === "submitted_by_lender" || p.status === "under_review_by_developer"
+        ).length;
+        const approvedLoans = proposals.filter(p =>
+          p.status === "accepted_by_developer" ||
+          p.status === "signed_by_developer" ||
+          p.status === "signed_by_lender" ||
+          p.status === "loan_term_fully_executed"
+        ).length;
+        const totalBalance = proposals
+          .filter(p =>
+            p.status === "accepted_by_developer" ||
+            p.status === "signed_by_developer" ||
+            p.status === "signed_by_lender" ||
+            p.status === "loan_term_fully_executed"
+          )
+          .reduce((sum, p) => sum + p.loan_amount_offered, 0);
+
+        setStats({ totalBalance, submittedBids, approvedLoans });
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
   return (
     <div className="space-y-6">
       <DashboardHeader title="Lender Dashboard" subtitle="Superfund" />
@@ -37,24 +102,44 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6">
         <div className="space-y-5">
-          {/*Stats Card*/}
+          {/* Stats Card */}
           <div className="space-y-2">
             <h2 className="text-lg font-semibold">Loans value</h2>
-            <StatsCards totalBalance={0} submittedBids={0} approvedLoans={0} />
+            <StatsCards
+              totalBalance={stats.totalBalance}
+              submittedBids={stats.submittedBids}
+              approvedLoans={stats.approvedLoans}
+            />
           </div>
-          {/*Loan Chart*/}
+          {/* Loan Chart */}
           <div className="">
             <LoansChart data={chartData} />
           </div>
-          {/*Portfolio Table*/}
+          {/* Portfolio Table */}
           <div className="space-y-2">
             <h2 className="text-lg font-semibold">Portfolio summary</h2>
             <PortfolioTable projects={[]} />
           </div>
         </div>
         <div className="space-y-2">
-          <h2 className="text-lg font-semibold">New Project</h2>
-          <ProjectCard project={mockProject} />
+          <h2 className="text-lg font-semibold">Latest Project</h2>
+          {isLoading ? (
+            <div className="rounded-xl border bg-white p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-[#E86A33]" />
+            </div>
+          ) : latestProject ? (
+            <ProjectCard project={latestProject} />
+          ) : (
+            <div className="rounded-xl border bg-white p-8 text-center">
+              <Building2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500 mb-4">No projects available yet</p>
+              <Link href="/dashboard/marketplace">
+                <Button size="sm" className="bg-[#E86A33] hover:bg-[#d55a25]">
+                  Browse Marketplace
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

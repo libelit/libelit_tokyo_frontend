@@ -382,3 +382,133 @@ export interface ProofUploadResponse {
   message: string;
   data?: MilestoneProof[];
 }
+
+// Developer Project Loan Proposal Types (proposals received from lenders)
+export type DeveloperProposalStatus =
+  | 'submitted_by_lender'
+  | 'under_review_by_developer'
+  | 'accepted_by_developer'
+  | 'rejected_by_developer'
+  | 'signed_by_developer'
+  | 'signed_by_lender'
+  | 'loan_term_fully_executed';
+
+export type DeveloperSecurityPackageType =
+  | 'mortgage'
+  | 'spv_charge'
+  | 'guarantees'
+  | 'personal_guarantee'
+  | 'corporate_guarantee';
+
+export interface DeveloperProposalLenderUser {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  avatar: string | null;
+  type: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeveloperProposalLender {
+  id: number;
+  user_id: number;
+  lender_type: string | null;
+  company_name: string | null;
+  address: string | null;
+  kyb_status: string;
+  kyb_submitted_at: string | null;
+  kyb_approved_at: string | null;
+  kyb_rejection_reason: string | null;
+  aml_status: string;
+  aml_checked_at: string | null;
+  accreditation_status: string;
+  accreditation_expires_at: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  user?: DeveloperProposalLenderUser;
+}
+
+export interface DeveloperProposalDocument {
+  id: number;
+  document_type: string;
+  document_type_label: string;
+  title: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  file_size_formatted: string;
+  mime_type: string;
+  verification_status: 'pending' | 'approved' | 'rejected';
+  verified_at: string | null;
+  rejection_reason: string | null;
+  expires_at: string | null;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  file_url: string;
+}
+
+export interface DeveloperProjectProposal {
+  id: number;
+  uuid: string;
+  loan_amount_offered: number;
+  currency: string;
+  interest_rate: number;
+  loan_maturity_date: string;
+  security_packages: DeveloperSecurityPackageType[];
+  max_ltv_accepted: number;
+  bid_expiry_date: string;
+  additional_conditions: string | null;
+  status: DeveloperProposalStatus;
+  status_label: string;
+  rejection_reason: string | null;
+  accepted_at: string | null;
+  developer_signed_at: string | null;
+  lender_signed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  lender: DeveloperProposalLender;
+  documents: DeveloperProposalDocument[];
+  documents_count: number;
+}
+
+export interface DeveloperProjectProposalListResponse {
+  success: boolean;
+  data: DeveloperProjectProposal[];
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
+export interface DeveloperProjectProposalResponse {
+  success: boolean;
+  data: DeveloperProjectProposal;
+  message?: string;
+}
+
+// Security Package Labels for display
+export const developerSecurityPackageLabels: Record<DeveloperSecurityPackageType, string> = {
+  mortgage: 'Mortgage',
+  spv_charge: 'SPV Charge',
+  guarantees: 'Guarantees',
+  personal_guarantee: 'Personal Guarantee',
+  corporate_guarantee: 'Corporate Guarantee',
+};
+
+// Status Labels and Colors for display
+export const developerProposalStatusConfig: Record<DeveloperProposalStatus, { label: string; color: string; bgColor: string }> = {
+  submitted_by_lender: { label: 'Pending Review', color: 'text-amber-700', bgColor: 'bg-amber-50' },
+  under_review_by_developer: { label: 'Under Review', color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  accepted_by_developer: { label: 'Accepted', color: 'text-green-700', bgColor: 'bg-green-50' },
+  rejected_by_developer: { label: 'Rejected', color: 'text-red-700', bgColor: 'bg-red-50' },
+  signed_by_developer: { label: 'Developer Signed', color: 'text-green-700', bgColor: 'bg-green-50' },
+  signed_by_lender: { label: 'Lender Signed', color: 'text-green-700', bgColor: 'bg-green-50' },
+  loan_term_fully_executed: { label: 'Loan Active', color: 'text-emerald-700', bgColor: 'bg-emerald-50' },
+};

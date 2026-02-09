@@ -20,6 +20,9 @@ import {
   AlertCircle,
   Download,
   Eye,
+  PenTool,
+  Loader2,
+  Circle,
 } from "lucide-react";
 import {
   LenderLoanProposal,
@@ -27,15 +30,21 @@ import {
   lenderProposalStatusConfig,
   LenderSecurityPackageType,
 } from "@/lib/types/lender";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface LenderProposalCardProps {
   proposal: LenderLoanProposal;
+  onSign?: (proposalId: number) => void;
+  isSigning?: boolean;
 }
 
-export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
+// Default status config for unknown statuses
+const defaultStatusConfig = { label: 'Unknown', color: 'text-gray-700', bgColor: 'bg-gray-100' };
+
+export function LenderProposalCard({ proposal, onSign, isSigning = false }: LenderProposalCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const statusConfig = lenderProposalStatusConfig[proposal.status];
+  const statusConfig = lenderProposalStatusConfig[proposal.status] || defaultStatusConfig;
 
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat("en-US", {
@@ -46,7 +55,8 @@ export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return null;
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -64,15 +74,27 @@ export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
   };
 
   const project = proposal.project;
-  console.log('proposal',project.cover_photo_url)
   const developer = project?.developer;
+
+  // Check if proposal is in accepted/active state (for signing flow)
+  const isAccepted = proposal.status === "accepted_by_developer" ||
+                     proposal.status === "signed_by_developer" ||
+                     proposal.status === "signed_by_lender" ||
+                     proposal.status === "loan_term_fully_executed";
+  const isRejected = proposal.status === "rejected_by_developer";
+  const isFullyExecuted = proposal.status === "loan_term_fully_executed";
+
+  // Check if lender can sign (accepted/developer signed and not yet signed by lender, not fully executed)
+  const canSign = (proposal.status === "accepted_by_developer" || proposal.status === "signed_by_developer") &&
+                  !proposal.lender_signed_at;
 
   return (
     <div
       className={cn(
         "rounded-xl border bg-white overflow-hidden transition-shadow hover:shadow-md",
-        proposal.status === "accepted" && "border-green-200",
-        proposal.status === "rejected" && "border-red-200"
+        isAccepted && "border-green-200",
+        isRejected && "border-red-200",
+        isFullyExecuted && "border-emerald-300"
       )}
     >
       {/* Header with Project Info */}
@@ -126,13 +148,13 @@ export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
                     statusConfig.color
                   )}
                 >
-                  {proposal.status === "accepted" && (
+                  {isAccepted && (
                     <CheckCircle2 className="h-3.5 w-3.5" />
                   )}
-                  {proposal.status === "rejected" && (
+                  {isRejected && (
                     <XCircle className="h-3.5 w-3.5" />
                   )}
-                  {proposal.status === "submitted_by_lender" && (
+                  {(proposal.status === "submitted_by_lender" || proposal.status === "under_review_by_developer") && (
                     <Clock className="h-3.5 w-3.5" />
                   )}
                   {proposal.status_label || statusConfig.label}
@@ -148,7 +170,7 @@ export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
         </div>
 
         {/* Expiring Soon Warning */}
-        {isExpiringSoon() && proposal.status === "submitted_by_lender" && (
+        {isExpiringSoon() && (proposal.status === "submitted_by_lender" || proposal.status === "under_review_by_developer") && (
           <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
             <p className="text-sm text-amber-700">
@@ -196,7 +218,7 @@ export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
         </div>
 
         {/* Rejection Reason */}
-        {proposal.status === "rejected" && proposal.rejection_reason && (
+        {isRejected && proposal.rejection_reason && (
           <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-100">
             <p className="text-xs font-medium text-red-800 mb-1">
               Rejection Reason
@@ -206,10 +228,11 @@ export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
         )}
 
         {/* Contract Section for Accepted Proposals */}
-        {proposal.status === "accepted" && (
+        {isAccepted && (
           <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-100">
-            <p className="text-xs font-medium text-green-800 mb-3 uppercase tracking-wide">
-              Contract Status
+            <p className="text-xs font-medium text-green-800 mb-3 uppercase tracking-wide flex items-center gap-2">
+              <PenTool className="h-4 w-4" />
+              Agreement Signing Status
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Lender Contract */}
@@ -225,16 +248,38 @@ export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
                   {proposal.lender_signed_at ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   ) : (
-                    <Clock className="h-4 w-4 text-gray-400" />
+                    <Circle className="h-4 w-4 text-gray-300" />
                   )}
-                  <span className="text-sm font-medium">Your Contract</span>
+                  <span className="text-sm font-medium">Your Signature</span>
                 </div>
                 {proposal.lender_signed_at ? (
                   <p className="text-xs text-green-700">
                     Signed {formatDate(proposal.lender_signed_at)}
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-500">Awaiting signature</p>
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">You need to sign the agreement</p>
+                    {onSign && (
+                      <Button
+                        size="sm"
+                        onClick={() => onSign(proposal.id)}
+                        disabled={isSigning}
+                        className="bg-[#E86A33] hover:bg-[#d55a25] text-white"
+                      >
+                        {isSigning ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Signing...
+                          </>
+                        ) : (
+                          <>
+                            <PenTool className="mr-2 h-4 w-4" />
+                            Sign Agreement
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -251,9 +296,9 @@ export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
                   {proposal.developer_signed_at ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   ) : (
-                    <Clock className="h-4 w-4 text-gray-400" />
+                    <Circle className="h-4 w-4 text-gray-300" />
                   )}
-                  <span className="text-sm font-medium">Developer&apos;s Contract</span>
+                  <span className="text-sm font-medium">Developer&apos;s Signature</span>
                 </div>
                 {proposal.developer_signed_at ? (
                   <p className="text-xs text-green-700">
@@ -270,7 +315,7 @@ export function LenderProposalCard({ proposal }: LenderProposalCardProps) {
               <div className="mt-4 p-3 bg-green-200 rounded-lg flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-green-700" />
                 <span className="text-sm font-medium text-green-800">
-                  Contract signing complete! Loan is now active.
+                  Agreement fully executed! Loan is now active.
                 </span>
               </div>
             )}

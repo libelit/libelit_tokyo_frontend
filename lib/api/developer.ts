@@ -28,6 +28,9 @@ import {
   ProjectPhotoListResponse,
   ProjectPhotoUploadResponse,
   ProjectPhotoResponse,
+  DeveloperProposalStatus,
+  DeveloperProjectProposalListResponse,
+  DeveloperProjectProposalResponse,
 } from "../types/developer";
 
 // Developer Profile Service
@@ -277,6 +280,74 @@ export const projectPhotosService = {
   ): Promise<ApiResponse<DeleteResponse>> {
     return apiClient.delete<DeleteResponse>(
       `/developer/projects/${projectId}/photos/${photoId}`
+    );
+  },
+};
+
+// Project Loan Proposals Service (proposals received from lenders)
+export const projectProposalsService = {
+  async list(
+    projectId: number,
+    params?: {
+      status?: "all" | DeveloperProposalStatus;
+      per_page?: number;
+      page?: number;
+    }
+  ): Promise<ApiResponse<DeveloperProjectProposalListResponse>> {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.append("status", params.status);
+    if (params?.per_page) searchParams.append("per_page", params.per_page.toString());
+    if (params?.page) searchParams.append("page", params.page.toString());
+
+    const queryString = searchParams.toString();
+    const endpoint = `/developer/projects/${projectId}/loan-proposals${queryString ? `?${queryString}` : ""}`;
+
+    return apiClient.get<DeveloperProjectProposalListResponse>(endpoint);
+  },
+
+  async get(
+    projectId: number,
+    proposalId: number
+  ): Promise<ApiResponse<DeveloperProjectProposalResponse>> {
+    return apiClient.get<DeveloperProjectProposalResponse>(
+      `/developer/projects/${projectId}/loan-proposals/${proposalId}`
+    );
+  },
+
+  async startReview(
+    proposalId: number
+  ): Promise<ApiResponse<DeveloperProjectProposalResponse>> {
+    return apiClient.patch<DeveloperProjectProposalResponse>(
+      `/developer/loan-proposals/${proposalId}`,
+      { action: "start_review" }
+    );
+  },
+
+  async accept(
+    proposalId: number
+  ): Promise<ApiResponse<DeveloperProjectProposalResponse>> {
+    return apiClient.patch<DeveloperProjectProposalResponse>(
+      `/developer/loan-proposals/${proposalId}`,
+      { action: "accept" }
+    );
+  },
+
+  async reject(
+    proposalId: number,
+    reason?: string
+  ): Promise<ApiResponse<DeveloperProjectProposalResponse>> {
+    return apiClient.patch<DeveloperProjectProposalResponse>(
+      `/developer/loan-proposals/${proposalId}`,
+      { action: "reject", rejection_reason: reason }
+    );
+  },
+
+  async sign(
+    proposalId: number
+  ): Promise<ApiResponse<DeveloperProjectProposalResponse>> {
+    return apiClient.patch<DeveloperProjectProposalResponse>(
+      `/developer/loan-proposals/${proposalId}`,
+      { action: "sign" }
     );
   },
 };

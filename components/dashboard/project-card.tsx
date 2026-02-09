@@ -38,14 +38,23 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
     if (!proposalStatus) return null;
 
     switch (proposalStatus) {
-      case "accepted":
+      case "accepted_by_developer":
+      case "signed_by_developer":
+      case "signed_by_lender":
         return (
           <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
             <CheckCircle2 className="h-3 w-3" />
             Accepted
           </div>
         );
-      case "rejected":
+      case "loan_term_fully_executed":
+        return (
+          <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-emerald-600 text-white text-xs font-medium rounded-full">
+            <CheckCircle2 className="h-3 w-3" />
+            Active
+          </div>
+        );
+      case "rejected_by_developer":
         return (
           <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full">
             <XCircle className="h-3 w-3" />
@@ -53,18 +62,11 @@ export function ProjectCard({ project, proposalStatus }: ProjectCardProps) {
           </div>
         );
       case "submitted_by_lender":
-      case "under_review":
+      case "under_review_by_developer":
         return (
           <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded-full">
             <Clock className="h-3 w-3" />
             Pending
-          </div>
-        );
-      case "expired":
-        return (
-          <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-gray-500 text-white text-xs font-medium rounded-full">
-            <Clock className="h-3 w-3" />
-            Expired
           </div>
         );
       default:
