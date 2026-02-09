@@ -242,3 +242,128 @@ export interface LenderProjectResponse {
   data: LenderProject;
   message?: string;
 }
+
+// Lender Loan Proposal Types
+export type LenderProposalStatus =
+  | 'submitted_by_lender'
+  | 'under_review'
+  | 'accepted'
+  | 'rejected'
+  | 'expired';
+
+export type LenderSecurityPackageType =
+  | 'mortgage'
+  | 'spv_charge'
+  | 'guarantees'
+  | 'personal_guarantee'
+  | 'corporate_guarantee';
+
+export interface LenderProposalDocument {
+  id: number;
+  document_type: string;
+  document_type_label: string;
+  title: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  file_size_formatted: string;
+  mime_type: string;
+  verification_status: 'pending' | 'approved' | 'rejected';
+  verified_at: string | null;
+  rejection_reason: string | null;
+  expires_at: string | null;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  file_url: string;
+}
+
+export interface LenderProposalProject {
+  id: number;
+  uuid: string;
+  title: string;
+  description: string | null;
+  project_type: LenderProjectType;
+  project_type_label: string;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  loan_amount: number;
+  amount_raised: number;
+  funding_progress: number;
+  currency: string;
+  min_investment: string;
+  status: LenderProjectStatus;
+  status_label: string;
+  submitted_at: string | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
+  listed_at: string | null;
+  funded_at: string | null;
+  construction_start_date: string | null;
+  construction_end_date: string | null;
+  created_at: string;
+  updated_at: string;
+  developer: LenderProjectDeveloper | null;
+  lenders_count: number;
+  cover_photo_url: string | null;
+}
+
+export interface LenderLoanProposal {
+  id: number;
+  uuid: string;
+  loan_amount_offered: number;
+  currency: string;
+  interest_rate: number;
+  loan_maturity_date: string;
+  security_packages: LenderSecurityPackageType[];
+  max_ltv_accepted: number;
+  bid_expiry_date: string;
+  additional_conditions: string | null;
+  status: LenderProposalStatus;
+  status_label: string;
+  rejection_reason: string | null;
+  accepted_at: string | null;
+  developer_signed_at: string | null;
+  lender_signed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  project: LenderProposalProject;
+  documents: LenderProposalDocument[];
+  documents_count: number;
+}
+
+export interface LenderProposalListResponse {
+  success: boolean;
+  data: LenderLoanProposal[];
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
+export interface LenderProposalResponse {
+  success: boolean;
+  data: LenderLoanProposal;
+  message?: string;
+}
+
+// Security Package Labels for display
+export const lenderSecurityPackageLabels: Record<LenderSecurityPackageType, string> = {
+  mortgage: 'Mortgage',
+  spv_charge: 'SPV Charge',
+  guarantees: 'Guarantees',
+  personal_guarantee: 'Personal Guarantee',
+  corporate_guarantee: 'Corporate Guarantee',
+};
+
+// Status Labels and Colors for display
+export const lenderProposalStatusConfig: Record<LenderProposalStatus, { label: string; color: string; bgColor: string }> = {
+  submitted_by_lender: { label: 'Pending Review', color: 'text-amber-700', bgColor: 'bg-amber-50' },
+  under_review: { label: 'Under Review', color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  accepted: { label: 'Accepted', color: 'text-green-700', bgColor: 'bg-green-50' },
+  rejected: { label: 'Rejected', color: 'text-red-700', bgColor: 'bg-red-50' },
+  expired: { label: 'Expired', color: 'text-gray-700', bgColor: 'bg-gray-100' },
+};

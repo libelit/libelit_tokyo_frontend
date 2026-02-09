@@ -24,6 +24,7 @@ export {
   lenderProjectDocumentsService,
   lenderMilestonesService,
   lenderProjectPhotosService,
+  lenderProposalsService,
 } from "./lender";
 
 export { loanProposalsService } from "./loan-proposals";

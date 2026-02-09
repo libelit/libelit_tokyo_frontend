@@ -45,3 +45,18 @@ export {
   proposalStatusConfig,
   contractStatusConfig,
 } from "./loan-proposal";
+
+export type {
+  LenderLoanProposal,
+  LenderProposalStatus,
+  LenderSecurityPackageType,
+  LenderProposalDocument,
+  LenderProposalProject,
+  LenderProposalListResponse,
+  LenderProposalResponse,
+} from "./lender";
+
+export {
+  lenderSecurityPackageLabels,
+  lenderProposalStatusConfig,
+} from "./lender";

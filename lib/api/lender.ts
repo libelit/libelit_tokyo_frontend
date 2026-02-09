@@ -11,6 +11,8 @@ import {
   DeleteResponse,
   LenderProjectListResponse,
   LenderProjectResponse,
+  LenderProposalListResponse,
+  LenderProposalResponse,
 } from "../types/lender";
 import {
   ProjectDocumentsResponse,
@@ -139,5 +141,28 @@ export const lenderProjectPhotosService = {
     return apiClient.get<ProjectPhotoListResponse>(
       `/lender/projects/${projectId}/photos`
     );
+  },
+};
+
+// Lender Proposals Service
+export const lenderProposalsService = {
+  async list(params?: {
+    status?: 'all' | 'submitted_by_lender' | 'under_review' | 'accepted' | 'rejected' | 'expired';
+    per_page?: number;
+    page?: number;
+  }): Promise<ApiResponse<LenderProposalListResponse>> {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.append("status", params.status);
+    if (params?.per_page) searchParams.append("per_page", params.per_page.toString());
+    if (params?.page) searchParams.append("page", params.page.toString());
+
+    const queryString = searchParams.toString();
+    const endpoint = `/lender/loan-proposals${queryString ? `?${queryString}` : ""}`;
+
+    return apiClient.get<LenderProposalListResponse>(endpoint);
+  },
+
+  async get(id: number): Promise<ApiResponse<LenderProposalResponse>> {
+    return apiClient.get<LenderProposalResponse>(`/lender/loan-proposals/${id}`);
   },
 };
