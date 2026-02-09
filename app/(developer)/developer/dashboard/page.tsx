@@ -5,6 +5,9 @@ import Link from "next/link";
 import { Building2, DollarSign, Clock, Plus, ArrowRight, Loader2 } from "lucide-react";
 import { DeveloperHeader } from "@/components/developer/developer-header";
 import { KybStatusBanner } from "@/components/developer/kyb-status-banner";
+import { FundingProgressChart } from "@/components/developer/funding-progress-chart";
+import { PendingTasksWidget } from "@/components/developer/pending-tasks-widget";
+import { RecentActivityFeed } from "@/components/developer/recent-activity-feed";
 import { Button } from "@/components/ui/button";
 import { developerProfileService, projectsService } from "@/lib/api";
 import type { DeveloperProfile, Project, KybStatus } from "@/lib/types";
@@ -158,6 +161,20 @@ export default function DeveloperDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Funding Progress Chart - Only show when KYB approved */}
+      {isKybApproved && (
+        <FundingProgressChart projects={recentProjects} />
+      )}
+
+      {/* Two Column Layout for Widgets */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Pending Tasks Widget */}
+        <PendingTasksWidget projects={recentProjects} kybStatus={kybStatus} />
+
+        {/* Recent Activity Feed */}
+        <RecentActivityFeed projects={recentProjects} />
+      </div>
 
       {/* Recent Projects */}
       <div className="rounded-xl border bg-white p-6 shadow-sm">
