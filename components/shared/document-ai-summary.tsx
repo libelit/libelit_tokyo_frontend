@@ -35,26 +35,16 @@ export function DocumentAISummary({
     setState({ loading: true, error: null, summary: null });
 
     try {
-      // Fetch the file client-side (has access to auth cookies/tokens)
-      const fileResponse = await fetch(fileUrl);
-      if (!fileResponse.ok) {
-        throw new Error("Failed to fetch document");
-      }
-
-      const blob = await fileResponse.blob();
-      const fileName = fileUrl.split("/").pop() || "document";
-      const file = new File([blob], fileName, { type: blob.type });
-
-      // Send the file to our API route
-      const formData = new FormData();
-      formData.append("file", file);
-      if (documentType) {
-        formData.append("documentType", documentType);
-      }
-
+      // Send the file URL to our API route (server fetches the file to avoid CORS)
       const response = await fetch("/api/analyze-document", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileUrl,
+          documentType,
+        }),
       });
 
       const data = await response.json();

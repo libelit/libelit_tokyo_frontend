@@ -5,13 +5,12 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const documentType = formData.get("documentType") as string | null;
+    const body = await request.json();
+    const { fileUrl, documentType } = body;
 
-    if (!file) {
+    if (!fileUrl) {
       return NextResponse.json(
-        { error: "No file provided" },
+        { error: "No file URL provided" },
         { status: 400 }
       );
     }
@@ -23,12 +22,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Fetch the file server-side (no CORS restrictions)
+    const fileResponse = await fetch(fileUrl);
+    if (!fileResponse.ok) {
+      return NextResponse.json(
+        { error: "Failed to fetch document from URL" },
+        { status: 400 }
+      );
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Convert file to base64
-    const bytes = await file.arrayBuffer();
+    const bytes = await fileResponse.arrayBuffer();
     const base64 = Buffer.from(bytes).toString("base64");
-    const mimeType = file.type || "application/pdf";
+    const mimeType = fileResponse.headers.get("content-type") || "application/pdf";
 
     const result = await model.generateContent([
       {
