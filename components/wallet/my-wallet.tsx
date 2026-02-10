@@ -1,47 +1,63 @@
 "use client";
 
+import { useState } from "react";
+import { useXrplWallet } from "@/lib/xrpl";
+import { WalletSetupModal } from "./wallet-setup-modal";
+import { WalletConnected } from "./wallet-connected";
 import { Button } from "@/components/ui/button";
-import {Separator} from "@/components/ui/separator";
+import { Separator } from "@/components/ui/separator";
+import { Fingerprint, Loader2 } from "lucide-react";
 
-interface MyWalletProps {
-  hasWallet?: boolean;
-  onCreateWallet?: () => void;
-  onConnectWallet?: () => void;
-}
+export function MyWallet() {
+  const { isConnected, isInitialized } = useXrplWallet();
+  const [showSetupModal, setShowSetupModal] = useState(false);
 
-export function MyWallet({
-  hasWallet = false,
-  onCreateWallet,
-  onConnectWallet
-}: MyWalletProps) {
-  if (hasWallet) {
-    // TODO: Implement wallet connected state
-    return null;
+  // Show loading state while initializing
+  if (!isInitialized) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">My Wallet</h2>
+        <Separator className="my-4 bg-[#B9C2CA]" />
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        </div>
+      </div>
+    );
   }
 
+  // Show connected wallet
+  if (isConnected) {
+    return <WalletConnected />;
+  }
+
+  // Show setup prompt
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">My Wallet</h2>
-      <Separator className="my-4 bg-[#B9C2CA]" />
-      <div className="flex flex-col items-center justify-center">
-        <p className="text-foreground py-10">You don't have any wallet yet</p>
+    <>
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">My Wallet</h2>
         <Separator className="my-4 bg-[#B9C2CA]" />
-        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+        <div className="flex flex-col items-center justify-center py-6">
+          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+            <Fingerprint className="h-8 w-8 text-[#E86A33]" />
+          </div>
+          <p className="text-foreground mb-2 font-medium">No wallet connected</p>
+          <p className="text-sm text-gray-500 text-center mb-6 max-w-xs">
+            Create a secure XRPL wallet using your device&apos;s biometrics. No seed phrases required.
+          </p>
           <Button
-            onClick={onCreateWallet}
-            className="bg-black hover:bg-gray-800 text-white px-6 rounded-full cursor-pointer"
+            onClick={() => setShowSetupModal(true)}
+            className="bg-[#E86A33] hover:bg-[#d55a25] text-white px-6 rounded-full"
           >
-            Create wallet
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onConnectWallet}
-            className="border-gray-300 text-gray-700 px-6 rounded-full cursor-pointer"
-          >
-            Connect wallet
+            <Fingerprint className="mr-2 h-4 w-4" />
+            Set Up Passkey Wallet
           </Button>
         </div>
       </div>
-    </div>
+
+      <WalletSetupModal
+        isOpen={showSetupModal}
+        onClose={() => setShowSetupModal(false)}
+      />
+    </>
   );
 }
