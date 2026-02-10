@@ -15,6 +15,10 @@ import {
   LenderProposalResponse,
   CreateLenderProposalRequest,
   CreateLenderProposalResponse,
+  LenderDrawdownResponse,
+  LenderMilestoneResponse,
+  LenderMilestoneActionResponse,
+  UploadPaymentProofData,
 } from "../types/lender";
 import {
   ProjectDocumentsResponse,
@@ -202,6 +206,72 @@ export const lenderProposalsService = {
     return apiClient.patch<LenderProposalResponse>(
       `/lender/loan-proposals/${proposalId}`,
       { action: "sign" }
+    );
+  },
+};
+
+// Lender Drawdown Service (Milestone Review & Payment)
+export const lenderDrawdownService = {
+  // List all milestones for a specific project
+  async listMilestones(projectId: number): Promise<ApiResponse<LenderDrawdownResponse>> {
+    return apiClient.get<LenderDrawdownResponse>(
+      `/lender/projects/${projectId}/milestones`
+    );
+  },
+
+  // Get single milestone details
+  async getMilestone(
+    projectId: number,
+    milestoneId: number
+  ): Promise<ApiResponse<LenderMilestoneResponse>> {
+    return apiClient.get<LenderMilestoneResponse>(
+      `/lender/projects/${projectId}/milestones/${milestoneId}`
+    );
+  },
+
+  // Approve a milestone
+  async approveMilestone(
+    projectId: number,
+    milestoneId: number
+  ): Promise<ApiResponse<LenderMilestoneActionResponse>> {
+    return apiClient.post<LenderMilestoneActionResponse>(
+      `/lender/projects/${projectId}/milestones/${milestoneId}/approve`
+    );
+  },
+
+  // Reject a milestone with reason
+  async rejectMilestone(
+    projectId: number,
+    milestoneId: number,
+    rejectionReason: string
+  ): Promise<ApiResponse<LenderMilestoneActionResponse>> {
+    return apiClient.post<LenderMilestoneActionResponse>(
+      `/lender/projects/${projectId}/milestones/${milestoneId}/reject`,
+      { rejection_reason: rejectionReason }
+    );
+  },
+
+  // Upload payment proof for an approved milestone
+  async uploadPaymentProof(
+    projectId: number,
+    milestoneId: number,
+    proofs: UploadPaymentProofData[],
+    paymentReference?: string
+  ): Promise<ApiResponse<LenderMilestoneActionResponse>> {
+    const formData = new FormData();
+
+    proofs.forEach((proof, index) => {
+      formData.append(`proofs[${index}][title]`, proof.title);
+      formData.append(`proofs[${index}][file]`, proof.file);
+    });
+
+    if (paymentReference) {
+      formData.append("payment_reference", paymentReference);
+    }
+
+    return apiClient.upload<LenderMilestoneActionResponse>(
+      `/lender/projects/${projectId}/milestones/${milestoneId}/payment-proof`,
+      formData
     );
   },
 };

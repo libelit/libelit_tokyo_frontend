@@ -294,6 +294,8 @@ export interface MilestoneProof {
   mime_type: string;
   file_url: string;
   uploaded_by: number;
+  is_payment_proof: boolean;
+  payment_uploaded_by: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -318,8 +320,39 @@ export interface ProjectMilestone {
   created_at: string;
   updated_at: string;
   proofs?: MilestoneProof[];
+  milestone_proofs?: MilestoneProof[];
+  payment_proofs?: MilestoneProof[];
   proofs_count?: number;
   can_complete: boolean;
+}
+
+// Drawdown Types
+export interface DrawdownMilestone extends ProjectMilestone {
+  project: {
+    id: number;
+    title: string;
+    status: ProjectStatus;
+    status_label: string;
+  };
+}
+
+export interface DrawdownStatistics {
+  total_milestones: number;
+  pending_milestones: number;
+  pending_review: number;
+  approved_milestones: number;
+  rejected_milestones: number;
+  paid_milestones: number;
+  total_amount: number;
+  paid_amount: number;
+  approved_amount: number;
+  pending_amount: number;
+}
+
+export interface DeveloperDrawdownResponse {
+  success: boolean;
+  data: DrawdownMilestone[];
+  statistics: DrawdownStatistics;
 }
 
 export interface MilestoneStatistics {

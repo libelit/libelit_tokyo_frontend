@@ -43,7 +43,10 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
 };
 
 export function ProjectStatusBadge({ status, className }: ProjectStatusBadgeProps) {
-  const config = statusConfig[status];
+  const config = statusConfig[status] || {
+    label: status?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || status,
+    className: "bg-gray-100 text-gray-700",
+  };
 
   return (
     <span

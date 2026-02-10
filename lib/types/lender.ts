@@ -166,6 +166,25 @@ export interface LenderProjectDocument {
   file_url: string;
 }
 
+export interface LenderMilestoneProof {
+  id: number;
+  milestone_id: number;
+  proof_type: string;
+  proof_type_label: string;
+  title: string;
+  description: string | null;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  file_url: string;
+  uploaded_by: number;
+  is_payment_proof: boolean;
+  payment_uploaded_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LenderProjectMilestone {
   id: number;
   project_id: number;
@@ -185,8 +204,62 @@ export interface LenderProjectMilestone {
   rejection_reason: string | null;
   created_at: string;
   updated_at: string;
-  proofs: unknown[];
+  proofs: LenderMilestoneProof[];
+  milestone_proofs?: LenderMilestoneProof[];
+  payment_proofs?: LenderMilestoneProof[];
+  proofs_count?: number;
   can_complete: boolean;
+}
+
+// Lender Drawdown Types
+export interface LenderDrawdownMilestone extends LenderProjectMilestone {
+  project: {
+    id: number;
+    title: string;
+    status: LenderProjectStatus;
+    status_label: string;
+    developer?: {
+      id: number;
+      company_name: string | null;
+      user?: {
+        name: string;
+      };
+    };
+  };
+}
+
+export interface LenderDrawdownStatistics {
+  total_milestones: number;
+  pending_review: number;
+  approved: number;
+  paid: number;
+  total_amount: string;
+  paid_amount: string;
+  approved_amount: string;
+  pending_amount: string;
+}
+
+export interface LenderDrawdownResponse {
+  success: boolean;
+  data: LenderDrawdownMilestone[];
+  statistics: LenderDrawdownStatistics;
+}
+
+export interface LenderMilestoneResponse {
+  success: boolean;
+  data: LenderDrawdownMilestone;
+  message?: string;
+}
+
+export interface LenderMilestoneActionResponse {
+  success: boolean;
+  message: string;
+  data?: LenderDrawdownMilestone;
+}
+
+export interface UploadPaymentProofData {
+  title: string;
+  file: File;
 }
 
 export interface LenderProject {

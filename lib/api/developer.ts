@@ -31,6 +31,10 @@ import {
   DeveloperProposalStatus,
   DeveloperProjectProposalListResponse,
   DeveloperProjectProposalResponse,
+  DrawdownMilestone,
+  DrawdownStatistics,
+  DeveloperDrawdownResponse,
+  ProjectMilestone,
 } from "../types/developer";
 
 // Developer Profile Service
@@ -349,5 +353,87 @@ export const projectProposalsService = {
       `/developer/loan-proposals/${proposalId}`,
       { action: "sign" }
     );
+  },
+};
+
+// Developer Drawdown Service (Aggregates milestones across projects)
+// Note: This aggregates data on the frontend. Consider adding a dedicated backend endpoint for better performance.
+export const developerDrawdownService = {
+  async getDrawdownData(): Promise<{
+    milestones: DrawdownMilestone[];
+    statistics: DrawdownStatistics;
+    projects: Project[];
+  }> {
+    // Fetch all projects
+    const projectsResponse = await projectsService.list({ per_page: 100 });
+
+    if (!projectsResponse.data?.success || !projectsResponse.data.data) {
+      return {
+        milestones: [],
+        statistics: {
+          total_milestones: 0,
+          pending_milestones: 0,
+          pending_review: 0,
+          approved_milestones: 0,
+          rejected_milestones: 0,
+          paid_milestones: 0,
+          total_amount: 0,
+          paid_amount: 0,
+          approved_amount: 0,
+          pending_amount: 0,
+        },
+        projects: [],
+      };
+    }
+
+    const projects = projectsResponse.data.data;
+    const allMilestones: DrawdownMilestone[] = [];
+
+    // Fetch milestones for each project
+    for (const project of projects) {
+      const milestonesResponse = await milestonesService.list(project.id);
+
+      if (milestonesResponse.data?.success && milestonesResponse.data.data) {
+        const projectMilestones = milestonesResponse.data.data.milestones;
+
+        // Filter to only show submitted invoices (not pending)
+        const submittedMilestones = projectMilestones.filter(
+          (m: ProjectMilestone) => m.status !== 'pending'
+        );
+
+        // Add project info to each milestone
+        submittedMilestones.forEach((milestone: ProjectMilestone) => {
+          allMilestones.push({
+            ...milestone,
+            project: {
+              id: project.id,
+              title: project.title,
+              status: project.status,
+              status_label: project.status.charAt(0).toUpperCase() + project.status.slice(1),
+            },
+          });
+        });
+      }
+    }
+
+    // Calculate statistics
+    const statistics: DrawdownStatistics = {
+      total_milestones: allMilestones.length,
+      pending_milestones: allMilestones.filter(m => m.status === 'pending').length,
+      pending_review: allMilestones.filter(m => m.status === 'proof_submitted').length,
+      approved_milestones: allMilestones.filter(m => m.status === 'approved').length,
+      rejected_milestones: allMilestones.filter(m => m.status === 'rejected').length,
+      paid_milestones: allMilestones.filter(m => m.status === 'paid').length,
+      total_amount: allMilestones.reduce((sum, m) => sum + Number(m.amount), 0),
+      paid_amount: allMilestones.filter(m => m.status === 'paid').reduce((sum, m) => sum + Number(m.amount), 0),
+      approved_amount: allMilestones.filter(m => m.status === 'approved').reduce((sum, m) => sum + Number(m.amount), 0),
+      pending_amount: allMilestones.filter(m => m.status === 'proof_submitted').reduce((sum, m) => sum + Number(m.amount), 0),
+    };
+
+    return {
+      milestones: allMilestones,
+      statistics,
+      projects,
+    };
   },
 };
