@@ -10,6 +10,9 @@ export type {
   RegisterResponse,
 } from "./auth";
 
+export { walletService } from "./wallet";
+export type { WalletData, WalletResponse, CreateWalletRequest } from "./wallet";
+
 export {
   developerProfileService,
   kybService,
