@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   images: {
     domains: ["localhost", "127.0.0.1", "libelit-docs.s3.amazonaws.com"],
     remotePatterns: [
