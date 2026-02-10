@@ -4,9 +4,10 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, ChevronLeft, ChevronRight, ArrowRight, X, XCircle, Loader2, ExternalLink, BadgeCheck, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, User, MapPin, FileText, CheckCircle2, Circle, Play, ChevronLeft, ChevronRight, ArrowRight, X, XCircle, Loader2, ExternalLink, BadgeCheck, Mail, Phone, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoanProposalModal, LoanProposalFormData } from "@/components/dashboard/loan-proposal-modal";
+import { DocumentAISummary } from "@/components/shared/document-ai-summary";
 import { lenderProjectsService, lenderProposalsService } from "@/lib/api";
 import type { LenderProject, LenderLoanProposal, LenderSecurityPackageType } from "@/lib/types/lender";
 import { toast } from "sonner";
@@ -60,6 +61,9 @@ export default function ProjectDetailsPage() {
   // Proposal state
   const [proposal, setProposal] = useState<LenderLoanProposal | null>(null);
   const [isLoadingProposal, setIsLoadingProposal] = useState(true);
+
+  // AI Summary state - tracks which document ID is showing summary
+  const [showAISummaryFor, setShowAISummaryFor] = useState<number | null>(null);
 
   // Fetch project data (includes documents, milestones, photos inline)
   const fetchProject = useCallback(async () => {
@@ -671,33 +675,57 @@ export default function ProjectDetailsPage() {
           <div className="rounded-xl border bg-white p-6 shadow-sm">
             <h4 className="text-sm font-medium text-gray-700 mb-4">Project documents ({project.documents?.length || 0})</h4>
             {project.documents && project.documents.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-3">
                 {project.documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors"
-                  >
-                    {doc.verification_status === "approved" ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                    ) : doc.verification_status === "rejected" ? (
-                      <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                    ) : (
-                      <Circle className="h-5 w-5 text-gray-300 flex-shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{doc.document_type_label}</p>
-                      <p className="text-xs text-gray-500">{doc.file_size_formatted}</p>
+                  <div key={doc.id} className="space-y-2">
+                    <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+                      {doc.verification_status === "approved" ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      ) : doc.verification_status === "rejected" ? (
+                        <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                      ) : (
+                        <Circle className="h-5 w-5 text-gray-300 flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{doc.document_type_label}</p>
+                        <p className="text-xs text-gray-500">{doc.file_size_formatted}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAISummaryFor(showAISummaryFor === doc.id ? null : doc.id)}
+                          className={`text-xs gap-1.5 ${
+                            showAISummaryFor === doc.id
+                              ? "bg-violet-100 border-violet-300 text-violet-700"
+                              : "bg-gradient-to-r from-violet-50 to-purple-50 border-violet-200 hover:from-violet-100 hover:to-purple-100 text-violet-700"
+                          }`}
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          AI Review
+                        </Button>
+                        <a
+                          href={doc.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button variant="outline" size="sm" className="text-xs">
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                        </a>
+                      </div>
                     </div>
-                    <a
-                      href={doc.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button variant="outline" size="sm" className="text-xs">
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        View
-                      </Button>
-                    </a>
+
+                    {/* AI Summary Panel */}
+                    {showAISummaryFor === doc.id && (
+                      <DocumentAISummary
+                        fileUrl={doc.file_url}
+                        documentType={doc.document_type_label}
+                        documentName={doc.document_type_label}
+                        className="ml-8"
+                      />
+                    )}
                   </div>
                 ))}
               </div>
