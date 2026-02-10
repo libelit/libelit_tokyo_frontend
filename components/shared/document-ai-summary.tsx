@@ -31,12 +31,23 @@ export function DocumentAISummary({
   });
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const analyzDocument = async () => {
+  const analyzeDocument = async () => {
     setState({ loading: true, error: null, summary: null });
 
     try {
+      // Fetch the file client-side (has access to auth cookies/tokens)
+      const fileResponse = await fetch(fileUrl);
+      if (!fileResponse.ok) {
+        throw new Error("Failed to fetch document");
+      }
+
+      const blob = await fileResponse.blob();
+      const fileName = fileUrl.split("/").pop() || "document";
+      const file = new File([blob], fileName, { type: blob.type });
+
+      // Send the file to our API route
       const formData = new FormData();
-      formData.append("fileUrl", fileUrl);
+      formData.append("file", file);
       if (documentType) {
         formData.append("documentType", documentType);
       }
@@ -72,7 +83,7 @@ export function DocumentAISummary({
       <Button
         variant="outline"
         size="sm"
-        onClick={analyzDocument}
+        onClick={analyzeDocument}
         className={cn(
           "gap-2 text-xs bg-gradient-to-r from-violet-50 to-purple-50 border-violet-200 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 text-violet-700",
           className
@@ -125,7 +136,7 @@ export function DocumentAISummary({
         <Button
           variant="outline"
           size="sm"
-          onClick={analyzDocument}
+          onClick={analyzeDocument}
           className="mt-3 text-xs border-red-200 text-red-700 hover:bg-red-100"
         >
           Try again
@@ -220,7 +231,7 @@ export function DocumentAISummary({
             <Button
               variant="ghost"
               size="sm"
-              onClick={analyzDocument}
+              onClick={analyzeDocument}
               className="h-6 text-xs text-violet-600 hover:text-violet-800 hover:bg-violet-100 px-2"
             >
               Regenerate
