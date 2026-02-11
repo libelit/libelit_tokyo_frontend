@@ -8,6 +8,8 @@ export type {
   LoginResponse,
   RegisterRequest,
   RegisterResponse,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
 } from "./auth";
 
 export { walletService } from "./wallet";

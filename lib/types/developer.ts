@@ -4,6 +4,7 @@ export interface DeveloperProfile {
   user_id: number;
   company_name: string | null;
   company_registration_number: string | null;
+  address: string | null;
   company_address: string | null;
   company_city: string | null;
   company_country: string | null;
@@ -34,16 +35,13 @@ export interface DeveloperUser {
 export type KybStatus = 'not_started' | 'pending' | 'under_review' | 'approved' | 'rejected';
 
 export interface UpdateDeveloperProfileRequest {
+  // User fields
+  name?: string;
+  phone?: string;
+  // Profile fields
   company_name?: string;
   company_registration_number?: string;
-  company_address?: string;
-  company_city?: string;
-  company_country?: string;
-  company_phone?: string;
-  company_website?: string;
-  years_in_business?: number;
-  total_projects_completed?: number;
-  bio?: string;
+  address?: string;
 }
 
 // Document Types

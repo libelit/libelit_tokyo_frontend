@@ -162,8 +162,8 @@ export function FundingProgressChart({ projects }: FundingProgressChartProps) {
                 borderRadius: "8px",
                 boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
               }}
-              formatter={(value: number, name: string) => [
-                formatCurrency(value),
+              formatter={(value, name) => [
+                formatCurrency(value as number),
                 name === "raised" ? "Amount Raised" : "Target Amount",
               ]}
               labelFormatter={(label) => label}

@@ -26,10 +26,24 @@ import {
   ProjectPhotoListResponse,
 } from "../types/developer";
 
+// Update Lender Profile Request
+export interface UpdateLenderProfileRequest {
+  name?: string;
+  phone?: string;
+  company_name?: string;
+  address?: string;
+}
+
 // Lender Profile Service
 export const lenderProfileService = {
   async getProfile(): Promise<ApiResponse<LenderProfileResponse>> {
     return apiClient.get<LenderProfileResponse>("/lender/profile");
+  },
+
+  async updateProfile(
+    data: UpdateLenderProfileRequest
+  ): Promise<ApiResponse<LenderProfileResponse>> {
+    return apiClient.put<LenderProfileResponse>("/lender/profile", data);
   },
 };
 

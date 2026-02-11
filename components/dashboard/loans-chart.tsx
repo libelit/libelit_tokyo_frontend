@@ -117,7 +117,7 @@ export function LoansChart({ data }: LoansChartProps) {
                   borderRadius: "8px",
                   fontSize: "12px",
                 }}
-                formatter={(value: number) => [formatCurrency(value), "Approved Loans"]}
+                formatter={(value) => [formatCurrency(value as number), "Approved Loans"]}
                 labelStyle={{ fontWeight: 600, marginBottom: 4 }}
               />
               <Area

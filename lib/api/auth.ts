@@ -44,6 +44,17 @@ export interface RegisterResponse {
   };
 }
 
+export interface ChangePasswordRequest {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface ChangePasswordResponse {
+  success: boolean;
+  message: string;
+}
+
 // Storage keys
 const AUTH_TOKEN_KEY = "auth_token";
 const AUTH_USER_KEY = "auth_user";
@@ -111,5 +122,11 @@ export const authService = {
     // Check if token is expired
     const now = Math.floor(Date.now() / 1000);
     return now < parseInt(expiresAt, 10);
+  },
+
+  async changePassword(
+    data: ChangePasswordRequest
+  ): Promise<ApiResponse<ChangePasswordResponse>> {
+    return apiClient.post<ChangePasswordResponse>("/change-password", data);
   },
 };
