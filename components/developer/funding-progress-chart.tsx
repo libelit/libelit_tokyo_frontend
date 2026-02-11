@@ -18,38 +18,46 @@ interface FundingProgressChartProps {
 }
 
 export function FundingProgressChart({ projects }: FundingProgressChartProps) {
-  const { chartData, totalFunding, trend, percentageChange } = useMemo(() => {
-    // Group projects by month and calculate cumulative funding
-    const monthlyData: Record<string, { raised: number; target: number }> = {};
+  const { chartData, totalFunding, totalTarget, trend, percentageChange } = useMemo(() => {
+    // Get the last 6 months
+    const now = new Date();
+    const months: { month: string; year: number; monthNum: number }[] = [];
 
-    // Sort projects by creation date
-    const sortedProjects = [...projects].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        month: date.toLocaleDateString("en-US", { month: "short" }),
+        year: date.getFullYear(),
+        monthNum: date.getMonth(),
+      });
+    }
+
+    // Filter projects that have funding (approved, funded, or completed with amount_raised > 0)
+    const fundedProjects = projects.filter(
+      (p) => (p.amount_raised && p.amount_raised > 0) ||
+             ["approved", "funded", "completed"].includes(p.status)
     );
 
-    sortedProjects.forEach((project) => {
-      const date = new Date(project.created_at);
-      const monthKey = date.toLocaleDateString("en-US", {
-        month: "short",
-        year: "2-digit",
-      });
-
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = { raised: 0, target: 0 };
-      }
-
-      monthlyData[monthKey].raised += project.amount_raised || 0;
-      monthlyData[monthKey].target += project.loan_amount || 0;
-    });
-
-    // Convert to array and calculate cumulative values
-    const entries = Object.entries(monthlyData);
+    // Calculate monthly data
     let cumulativeRaised = 0;
     let cumulativeTarget = 0;
 
-    const data = entries.map(([month, values]) => {
-      cumulativeRaised += values.raised;
-      cumulativeTarget += values.target;
+    const data = months.map(({ month, year, monthNum }) => {
+      // Find projects that got funding in this month
+      // Use funded_at, approved_at, or created_at as the reference date
+      const monthProjects = fundedProjects.filter((project) => {
+        const refDate = new Date(
+          project.funded_at || project.approved_at || project.created_at
+        );
+        return refDate.getFullYear() === year && refDate.getMonth() === monthNum;
+      });
+
+      // Add this month's values to cumulative totals
+      monthProjects.forEach((project) => {
+        cumulativeRaised += project.amount_raised || 0;
+        cumulativeTarget += project.loan_amount || 0;
+      });
+
       return {
         month,
         raised: cumulativeRaised,
@@ -57,32 +65,18 @@ export function FundingProgressChart({ projects }: FundingProgressChartProps) {
       };
     });
 
-    // If no data, generate placeholder months
-    if (data.length === 0) {
-      const now = new Date();
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        data.push({
-          month: date.toLocaleDateString("en-US", {
-            month: "short",
-            year: "2-digit",
-          }),
-          raised: 0,
-          target: 0,
-        });
-      }
-    }
-
-    // Calculate trend
-    const total = cumulativeRaised;
-    const previousTotal = data.length > 1 ? data[data.length - 2]?.raised || 0 : 0;
-    const change = previousTotal > 0
-      ? ((total - previousTotal) / previousTotal) * 100
-      : total > 0 ? 100 : 0;
+    // Calculate trend (comparing last month to previous month)
+    const currentMonthRaised = data[data.length - 1]?.raised || 0;
+    const previousMonthRaised = data[data.length - 2]?.raised || 0;
+    const monthlyChange = currentMonthRaised - previousMonthRaised;
+    const change = previousMonthRaised > 0
+      ? (monthlyChange / previousMonthRaised) * 100
+      : monthlyChange > 0 ? 100 : 0;
 
     return {
       chartData: data,
-      totalFunding: total,
+      totalFunding: cumulativeRaised,
+      totalTarget: cumulativeTarget,
       trend: change >= 0 ? "up" : "down",
       percentageChange: Math.abs(change).toFixed(1),
     };
@@ -98,6 +92,11 @@ export function FundingProgressChart({ projects }: FundingProgressChartProps) {
     return `$${value}`;
   };
 
+  // Calculate funding percentage
+  const fundingPercentage = totalTarget > 0
+    ? Math.round((totalFunding / totalTarget) * 100)
+    : 0;
+
   return (
     <div className="rounded-xl border bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between mb-6">
@@ -106,18 +105,23 @@ export function FundingProgressChart({ projects }: FundingProgressChartProps) {
           <p className="text-sm text-gray-500">Cumulative funding over time</p>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-bold">{formatCurrency(totalFunding)}</p>
-          <div className="flex items-center justify-end gap-1 text-sm">
-            {trend === "up" ? (
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-red-500" />
-            )}
-            <span className={trend === "up" ? "text-green-600" : "text-red-600"}>
-              {percentageChange}%
-            </span>
-            <span className="text-gray-500">vs last period</span>
-          </div>
+          <p className="text-2xl font-bold text-[#E86A33]">{formatCurrency(totalFunding)}</p>
+          <p className="text-sm text-gray-500">
+            of {formatCurrency(totalTarget)} target ({fundingPercentage}%)
+          </p>
+          {(totalFunding > 0 || Number(percentageChange) > 0) && (
+            <div className="flex items-center justify-end gap-1 text-sm mt-1">
+              {trend === "up" ? (
+                <TrendingUp className="h-4 w-4 text-green-500" />
+              ) : (
+                <TrendingDown className="h-4 w-4 text-red-500" />
+              )}
+              <span className={trend === "up" ? "text-green-600" : "text-red-600"}>
+                {percentageChange}%
+              </span>
+              <span className="text-gray-500">vs last month</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -149,6 +153,7 @@ export function FundingProgressChart({ projects }: FundingProgressChartProps) {
               tickLine={false}
               tick={{ fill: "#9CA3AF", fontSize: 12 }}
               tickFormatter={formatCurrency}
+              width={60}
             />
             <Tooltip
               contentStyle={{
@@ -157,11 +162,11 @@ export function FundingProgressChart({ projects }: FundingProgressChartProps) {
                 borderRadius: "8px",
                 boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
               }}
-              formatter={(value) => [
-                formatCurrency(value as number),
-                "",
+              formatter={(value: number, name: string) => [
+                formatCurrency(value),
+                name === "raised" ? "Amount Raised" : "Target Amount",
               ]}
-              labelFormatter={(label) => `Month: ${label}`}
+              labelFormatter={(label) => label}
             />
             <Area
               type="monotone"
@@ -170,6 +175,7 @@ export function FundingProgressChart({ projects }: FundingProgressChartProps) {
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#colorTarget)"
+              name="target"
             />
             <Area
               type="monotone"
@@ -178,6 +184,7 @@ export function FundingProgressChart({ projects }: FundingProgressChartProps) {
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#colorRaised)"
+              name="raised"
             />
           </AreaChart>
         </ResponsiveContainer>

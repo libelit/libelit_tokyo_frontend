@@ -54,9 +54,6 @@ export function TransactionsHistory({ transactions }: TransactionsHistoryProps) 
                 <SortableHeader>Project</SortableHeader>
               </TableHead>
               <TableHead className="py-4 text-center font-medium text-gray-600">
-                <SortableHeader>No. of tokens</SortableHeader>
-              </TableHead>
-              <TableHead className="py-4 text-center font-medium text-gray-600">
                 <SortableHeader>Value</SortableHeader>
               </TableHead>
             </TableRow>
@@ -82,7 +79,6 @@ export function TransactionsHistory({ transactions }: TransactionsHistoryProps) 
                   <TableCell className="py-4">{transaction.date}</TableCell>
                   <TableCell className="py-4">{transaction.time}</TableCell>
                   <TableCell className="py-4">{transaction.project}</TableCell>
-                  <TableCell className="py-4 text-center">{transaction.noOfTokens}</TableCell>
                   <TableCell className="py-4 text-center">
                     ${transaction.value.toLocaleString()}
                   </TableCell>

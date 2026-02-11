@@ -15,6 +15,7 @@ import type { DeveloperProfile, Project, KybStatus } from "@/lib/types";
 export default function DeveloperDashboardPage() {
   const [profile, setProfile] = useState<DeveloperProfile | null>(null);
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,11 +35,14 @@ export default function DeveloperDashboardPage() {
           setProfile(profileResponse.data.data);
         }
 
-        // Fetch recent projects if KYB is approved
+        // Fetch projects if KYB is approved
         if (profileResponse.data?.data?.kyb_status === "approved") {
-          const projectsResponse = await projectsService.list({ per_page: 5 });
-          if (projectsResponse.data?.data) {
-            setRecentProjects(projectsResponse.data.data);
+          // Fetch all projects for chart data
+          const allProjectsResponse = await projectsService.list({ per_page: 100 });
+          if (allProjectsResponse.data?.data) {
+            setAllProjects(allProjectsResponse.data.data);
+            // Use first 5 for recent projects display
+            setRecentProjects(allProjectsResponse.data.data.slice(0, 5));
           }
         }
       } catch (err) {
@@ -83,13 +87,13 @@ export default function DeveloperDashboardPage() {
   const kybStatus: KybStatus = profile?.kyb_status || "not_started";
   const isKybApproved = kybStatus === "approved";
 
-  // Calculate stats from projects
+  // Calculate stats from all projects
   const stats = {
-    activeProjects: recentProjects.filter(
+    activeProjects: allProjects.filter(
       (p) => !["draft", "rejected", "completed"].includes(p.status)
     ).length,
-    totalFunding: recentProjects.reduce((sum, p) => sum + (p.amount_raised || 0), 0),
-    pendingRequests: recentProjects.filter(
+    totalFunding: allProjects.reduce((sum, p) => sum + (p.amount_raised || 0), 0),
+    pendingRequests: allProjects.filter(
       (p) => p.status === "submitted" || p.status === "under_review"
     ).length,
   };
@@ -164,7 +168,7 @@ export default function DeveloperDashboardPage() {
 
       {/* Funding Progress Chart - Only show when KYB approved */}
       {isKybApproved && (
-        <FundingProgressChart projects={recentProjects} />
+        <FundingProgressChart projects={allProjects} />
       )}
 
       {/* Two Column Layout for Widgets */}

@@ -9,20 +9,47 @@ import { PortfolioTable } from "@/components/dashboard/portfolio-table";
 import { ProjectCard, Project as CardProject } from "@/components/dashboard/project-card";
 import { Separator } from "@/components/ui/separator";
 import { lenderProjectsService, lenderProposalsService } from "@/lib/api";
-import type { LenderProject } from "@/lib/types/lender";
+import type { LenderProject, LenderLoanProposal } from "@/lib/types/lender";
 import { Building2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-// Chart data - will be populated from API when available
-const chartData = [
-  { date: "Jan", value: 0 },
-  { date: "Feb", value: 0 },
-  { date: "Mar", value: 0 },
-  { date: "Apr", value: 0 },
-  { date: "Mai", value: 0 },
-  { date: "Jun", value: 0 },
-];
+// Helper to generate chart data from approved proposals
+function generateChartData(proposals: LenderLoanProposal[]): { date: string; value: number }[] {
+  const approvedStatuses = [
+    "accepted_by_developer",
+    "signed_by_developer",
+    "signed_by_lender",
+    "loan_term_fully_executed",
+  ];
+
+  const approvedProposals = proposals.filter((p) =>
+    approvedStatuses.includes(p.status)
+  );
+
+  // Get last 6 months
+  const months: { date: string; value: number }[] = [];
+  const now = new Date();
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthName = d.toLocaleString("en-US", { month: "short" });
+    const year = d.getFullYear();
+    const month = d.getMonth();
+
+    // Sum loan amounts for proposals accepted in this month
+    const monthTotal = approvedProposals
+      .filter((p) => {
+        const acceptedDate = new Date(p.accepted_at || p.created_at);
+        return acceptedDate.getFullYear() === year && acceptedDate.getMonth() === month;
+      })
+      .reduce((sum, p) => sum + p.loan_amount_offered, 0);
+
+    months.push({ date: monthName, value: monthTotal });
+  }
+
+  return months;
+}
 
 // Helper to map LenderProject to CardProject
 function mapToCardProject(project: LenderProject): CardProject {
@@ -46,6 +73,7 @@ function mapToCardProject(project: LenderProject): CardProject {
 export default function DashboardPage() {
   const [latestProject, setLatestProject] = useState<CardProject | null>(null);
   const [stats, setStats] = useState({ totalBalance: 0, submittedBids: 0, approvedLoans: 0 });
+  const [chartData, setChartData] = useState<{ date: string; value: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
@@ -80,6 +108,9 @@ export default function DashboardPage() {
           .reduce((sum, p) => sum + p.loan_amount_offered, 0);
 
         setStats({ totalBalance, submittedBids, approvedLoans });
+
+        // Generate chart data from proposals
+        setChartData(generateChartData(proposals));
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
