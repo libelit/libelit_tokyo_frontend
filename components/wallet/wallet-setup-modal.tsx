@@ -23,18 +23,23 @@ export function WalletSetupModal({ isOpen, onClose, onSuccess }: WalletSetupModa
     setError(null);
     setSuccess(false);
 
-    const address = await connect();
+    try {
+      const address = await connect();
 
-    if (address) {
-      setSuccess(true);
-      setConnectedAddress(address);
-      onSuccess?.(address);
-      // Auto close after success
-      setTimeout(() => {
-        onClose();
-      }, 2000);
-    } else {
-      setError("Failed to create wallet. Please try again.");
+      if (address) {
+        setSuccess(true);
+        setConnectedAddress(address);
+        onSuccess?.(address);
+        // Auto close after success
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+      } else {
+        setError("Failed to create wallet. Please try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("An error occurred during setup. Please ensure your device supports passkeys.");
     }
   };
 
@@ -68,7 +73,7 @@ export function WalletSetupModal({ isOpen, onClose, onSuccess }: WalletSetupModa
           {/* Description */}
           <p className="text-gray-600 mb-6">
             Create a secure wallet using your device&apos;s biometrics (Face ID, Touch ID, or fingerprint).
-            No seed phrases to remember.
+            Your private key is stored securely on this device.
           </p>
 
           {/* Error message */}
@@ -98,11 +103,11 @@ export function WalletSetupModal({ isOpen, onClose, onSuccess }: WalletSetupModa
             </div>
             <div className="flex items-start gap-2">
               <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-600">Non-custodial - you control your keys</span>
+              <span className="text-sm text-gray-600">Non-custodial - only you have access</span>
             </div>
             <div className="flex items-start gap-2">
               <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-600">Recoverable on any device with your passkey</span>
+              <span className="text-sm text-gray-600">Device-bound security</span>
             </div>
           </div>
 
@@ -116,7 +121,7 @@ export function WalletSetupModal({ isOpen, onClose, onSuccess }: WalletSetupModa
               {isConnecting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Setting up...
+                  Creating Wallet & Funding...
                 </>
               ) : success ? (
                 <>

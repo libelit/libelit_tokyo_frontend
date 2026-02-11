@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useXrplWallet } from "@/lib/xrpl";
+import { useAuth } from "@/components/auth";
 import { WalletSetupModal } from "@/components/wallet/wallet-setup-modal";
 import { Button } from "@/components/ui/button";
 import { Fingerprint, CheckCircle, Wallet } from "lucide-react";
@@ -14,6 +15,9 @@ export function ConnectWallet() {
   if (!isInitialized) {
     return null;
   }
+
+  const { user } = useAuth(); // Get user to determine dashboard path
+  const walletPath = user?.type === "developer" ? "/developer/dashboard/wallet" : "/dashboard/wallet";
 
   // Show connected state
   if (isConnected && address) {
@@ -33,7 +37,7 @@ export function ConnectWallet() {
         <Button
           variant="outline"
           className="border-green-300 text-green-700 hover:bg-green-100 shrink-0 px-6 rounded-full"
-          onClick={() => window.location.href = "/dashboard/wallet"}
+          onClick={() => window.location.href = walletPath}
         >
           <Wallet className="mr-2 h-4 w-4" />
           View Wallet

@@ -7,6 +7,7 @@ import { DeveloperHeader } from "@/components/developer/developer-header";
 import { KybStatusBanner } from "@/components/developer/kyb-status-banner";
 import { FundingProgressChart } from "@/components/developer/funding-progress-chart";
 import { RecentActivityFeed } from "@/components/developer/recent-activity-feed";
+import { ConnectWallet } from "@/components/dashboard/connect-wallet";
 import { Button } from "@/components/ui/button";
 import { developerProfileService, projectsService } from "@/lib/api";
 import type { DeveloperProfile, Project, KybStatus } from "@/lib/types";
@@ -100,6 +101,9 @@ export default function DeveloperDashboardPage() {
   return (
     <div className="space-y-6">
       <DeveloperHeader title="Developer Dashboard" />
+
+      {/* Wallet Connection */}
+      <ConnectWallet />
 
       {/* KYB Status Banner */}
       <KybStatusBanner

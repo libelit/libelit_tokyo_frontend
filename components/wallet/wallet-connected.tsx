@@ -8,7 +8,7 @@ import { Copy, CheckCircle, ExternalLink, RefreshCw, Wallet } from "lucide-react
 import { XRPL_NETWORK } from "@/lib/xrpl";
 
 export function WalletConnected() {
-  const { address, walletData, getBalance, disconnect } = useXrplWallet();
+  const { address, walletData, getBalance, disconnect, fundWallet } = useXrplWallet();
   const [balance, setBalance] = useState<string>("0");
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -17,8 +17,11 @@ export function WalletConnected() {
     setIsLoadingBalance(true);
     try {
       const bal = await getBalance();
-      // Convert drops to XRP (1 XRP = 1,000,000 drops)
-      const xrpBalance = (parseInt(bal) / 1_000_000).toFixed(6);
+      // Balance is already in XRP
+      const xrpBalance = parseFloat(bal).toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 6
+      });
       setBalance(xrpBalance);
     } catch (error) {
       console.error("Failed to fetch balance:", error);
@@ -140,12 +143,30 @@ export function WalletConnected() {
         <Button variant="outline" className="flex-1" disabled>
           Send
         </Button>
+        {XRPL_NETWORK !== "mainnet" && (
+          <Button
+            variant="secondary"
+            className="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"
+            onClick={async () => {
+              setIsLoadingBalance(true);
+              await fundWallet();
+              await fetchBalance();
+              setIsLoadingBalance(false);
+            }}
+          >
+            Fund (Testnet)
+          </Button>
+        )}
       </div>
 
       {/* Info text */}
       <p className="text-xs text-gray-500 text-center">
         {XRPL_NETWORK !== "mainnet" && (
-          <>This is a {XRPL_NETWORK} wallet. Funds are not real XRP.</>
+          <>
+            This is a {XRPL_NETWORK} wallet. Funds are not real XRP.
+            <br />
+            <span className="text-blue-600">Fund button is for Testnet/Devnet only.</span>
+          </>
         )}
       </p>
     </div>

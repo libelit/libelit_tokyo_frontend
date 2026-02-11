@@ -1,12 +1,13 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import { Web3Auth } from "@web3auth/modal";
-import { CHAIN_NAMESPACES, IProvider } from "@web3auth/base";
-import { XrplPrivateKeyProvider } from "@web3auth/xrpl-provider";
-import { WEB3AUTH_CLIENT_ID, getChainConfig, WEB3AUTH_NETWORK_CONFIG } from "./config";
 import { walletService, type WalletData } from "@/lib/api/wallet";
+import { passkeyService } from "./passkey-service";
+import { walletManager } from "./wallet-manager";
+import { useAuth } from "@/components/auth";
 
+// Define a simpler provider validation interface if needed, or remove IProvider if not strictly used as Web3Auth type
+// For now, we'll remove IProvider as it was Web3Auth specific.
 interface XrplWalletContextType {
   // Connection state
   isConnected: boolean;
@@ -20,6 +21,7 @@ interface XrplWalletContextType {
   // Actions
   connect: () => Promise<string | null>;
   disconnect: () => Promise<void>;
+  fundWallet: () => Promise<void>;
 
   // XRPL operations
   getAccounts: () => Promise<string[]>;
@@ -27,83 +29,45 @@ interface XrplWalletContextType {
   signMessage: (message: string) => Promise<string>;
   signAndSendTransaction: (tx: object) => Promise<string>;
 
-  // Provider access
-  provider: IProvider | null;
+  // Provider access - Removing Web3Auth provider, exposing walletManager if needed or just null
+  provider: null;
 }
 
 const XrplWalletContext = createContext<XrplWalletContextType | undefined>(undefined);
 
-let web3authInstance: Web3Auth | null = null;
-
 export function XrplWalletProvider({ children }: { children: ReactNode }) {
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [isInitialized, setIsInitialized] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [provider, setProvider] = useState<IProvider | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [walletData, setWalletData] = useState<WalletData | null>(null);
 
-  // Initialize Web3Auth
+  // Initialize and react to user changes
   useEffect(() => {
     const init = async () => {
-      try {
-        if (!WEB3AUTH_CLIENT_ID) {
-          console.warn("Web3Auth Client ID not configured");
-          setIsInitialized(true);
-          return;
-        }
+      // If auth is loading, wait
+      if (isAuthLoading) return;
 
-        const chainConfig = getChainConfig();
-
-        const xrplProvider = new XrplPrivateKeyProvider({
-          config: {
-            chainConfig: {
-              chainNamespace: CHAIN_NAMESPACES.OTHER,
-              chainId: chainConfig.chainId,
-              rpcTarget: chainConfig.rpcTarget,
-              displayName: chainConfig.displayName,
-              blockExplorerUrl: chainConfig.blockExplorerUrl,
-              ticker: chainConfig.ticker,
-              tickerName: chainConfig.tickerName,
-            },
-          },
-        });
-
-        const web3auth = new Web3Auth({
-          clientId: WEB3AUTH_CLIENT_ID,
-          web3AuthNetwork: WEB3AUTH_NETWORK_CONFIG,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          privateKeyProvider: xrplProvider as any,
-          uiConfig: {
-            appName: "Libelit",
-            mode: "light",
-            loginMethodsOrder: ["google", "apple", "email_passwordless"],
-            primaryButton: "socialLogin",
-          },
-        });
-
-        await web3auth.init();
-        web3authInstance = web3auth;
-
-        // Check if already connected
-        if (web3auth.connected && web3auth.provider) {
-          setProvider(web3auth.provider);
-          const accounts = await web3auth.provider.request({
-            method: "xrpl_getAccounts",
-          }) as string[] | null;
-          if (accounts && accounts.length > 0) {
-            setAddress(accounts[0]);
-          }
-        }
-
-        setIsInitialized(true);
-      } catch (error) {
-        console.error("Failed to initialize Web3Auth:", error);
-        setIsInitialized(true);
+      // If no user, reset state
+      if (!user) {
+        setAddress(null);
+        setWalletData(null);
+        setIsInitialized(true); // Initialized as "not connected"
+        return;
       }
+
+      // Check if wallet exists locally for this user
+      const localWallet = walletManager.loadWallet(user.id.toString());
+      if (localWallet) {
+        setAddress(localWallet.address);
+      } else {
+        setAddress(null);
+      }
+      setIsInitialized(true);
     };
 
     init();
-  }, []);
+  }, [user, isAuthLoading]);
 
   // Fetch wallet data from backend when address changes
   useEffect(() => {
@@ -111,47 +75,67 @@ export function XrplWalletProvider({ children }: { children: ReactNode }) {
       const response = await walletService.getWallet();
       if (response.data?.success && response.data.data) {
         setWalletData(response.data.data);
-        setAddress(response.data.data.xrpl_address);
+        // Ensure address stays synced if backend has it
+        if (!address) {
+          setAddress(response.data.data.xrpl_address);
+        }
       }
     };
 
-    // Only fetch if we have auth token
-    if (typeof window !== "undefined" && localStorage.getItem("auth_token")) {
+    // Only fetch if we have auth token (which is implied if user is present, but good to check)
+    if (user && typeof window !== "undefined" && localStorage.getItem("auth_token")) {
       fetchWalletData();
     }
-  }, []);
+  }, [address, user]);
 
   const connect = useCallback(async (): Promise<string | null> => {
-    if (!web3authInstance) {
-      console.error("Web3Auth not initialized");
+    if (!user) {
+      console.error("Cannot connect wallet: User not authenticated");
       return null;
     }
 
     try {
       setIsConnecting(true);
-      const web3authProvider = await web3authInstance.connect();
 
-      if (!web3authProvider) {
-        throw new Error("Failed to connect to Web3Auth");
+      // 1. Passkey Registration / Auth
+      const isSupported = await passkeyService.isSupported();
+      if (!isSupported) {
+        throw new Error("Passkeys are not supported on this device.");
       }
 
-      setProvider(web3authProvider);
+      // Check if we already have a wallet locally for this user
+      if (walletManager.hasWallet(user.id.toString())) {
+        const authSuccess = await passkeyService.authenticate();
+        if (!authSuccess) throw new Error("Passkey authentication failed.");
 
-      // Get the XRPL address
-      const accounts = await web3authProvider.request({
-        method: "xrpl_getAccounts",
-      }) as string[] | null;
-
-      if (!accounts || accounts.length === 0) {
-        throw new Error("No accounts returned from provider");
+        const wallet = walletManager.loadWallet(user.id.toString());
+        if (wallet) {
+          setAddress(wallet.address);
+          return wallet.address;
+        }
       }
 
-      const xrplAddress = accounts[0];
-      setAddress(xrplAddress);
+      // If no wallet or forced new setup:
+      // We use the user's name or email for passkey registration
+      const username = user.email || user.name || "User";
+      const regSuccess = await passkeyService.register(username);
 
-      // Store wallet in backend
+      if (!regSuccess) {
+        throw new Error("Passkey registration failed.");
+      }
+
+      // 2. Create XRPL Wallet
+      const wallet = await walletManager.createWallet(user.id.toString());
+
+      // Fund if on testnet (async, don't block UI strictly but good to wait slightly or let it happen in bg)
+      // We'll await it so the user sees "Wallet Created" after it's actually usable
+      await walletManager.fundWallet(wallet);
+
+      setAddress(wallet.address);
+
+      // 3. Store wallet in backend
       const response = await walletService.createWallet({
-        xrpl_address: xrplAddress,
+        xrpl_address: wallet.address,
         label: "Primary Wallet",
       });
 
@@ -159,98 +143,70 @@ export function XrplWalletProvider({ children }: { children: ReactNode }) {
         setWalletData(response.data.data);
       }
 
-      return xrplAddress;
+      return wallet.address;
     } catch (error) {
       console.error("Failed to connect:", error);
       return null;
     } finally {
       setIsConnecting(false);
     }
-  }, []);
+  }, [user]);
 
-  const disconnect = useCallback(async () => {
-    if (!web3authInstance) return;
+  const disconnect = async () => {
+    // For local wallet, disconnection just means clearing state
+    // We don't delete the seed from local storage (that would be "reset wallet")
+    setAddress(null);
+    setWalletData(null);
+    // Optionally trigger backend logout if needed, but here we just disconnect wallet view
+  };
 
-    try {
-      await web3authInstance.logout();
-      setProvider(null);
-      setAddress(null);
-      // Note: We don't delete wallet from backend on disconnect
-      // The wallet address is still valid and can be reconnected
-    } catch (error) {
-      console.error("Failed to disconnect:", error);
+  const fundWallet = async () => {
+    if (!user) throw new Error("User not authenticated");
+    const wallet = walletManager.loadWallet(user.id.toString());
+    if (wallet) {
+      await walletManager.fundWallet(wallet);
     }
-  }, []);
+  };
 
-  const getAccounts = useCallback(async (): Promise<string[]> => {
-    if (!provider) return [];
+  const getAccounts = async () => {
+    return address ? [address] : [];
+  };
 
-    try {
-      const accounts = await provider.request({
-        method: "xrpl_getAccounts",
-      }) as string[] | null;
-      return accounts || [];
-    } catch (error) {
-      console.error("Failed to get accounts:", error);
-      return [];
+  const getBalance = async () => {
+    // This would typically involve an XRPL Client call
+    // For now we can return '0' or implement actual fetch via Client
+    if (address) {
+      // Since getBalance only needs address, we can call it directly
+      // But walletManager handles client connection
+      return walletManager.getBalance(address);
     }
-  }, [provider]);
+    return "0";
+  };
 
-  const getBalance = useCallback(async (): Promise<string> => {
-    if (!provider || !address) return "0";
+  const signMessage = async (message: string) => {
+    if (!user) throw new Error("User not authenticated");
+    return walletManager.signMessage(user.id.toString(), message);
+  };
 
-    try {
-      const balance = await provider.request({
-        method: "xrpl_getBalance",
-      }) as string | null;
-      return balance || "0";
-    } catch (error) {
-      console.error("Failed to get balance:", error);
-      return "0";
-    }
-  }, [provider, address]);
-
-  const signMessage = useCallback(
-    async (message: string): Promise<string> => {
-      if (!provider) throw new Error("Provider not connected");
-
-      const result = await provider.request({
-        method: "xrpl_signMessage",
-        params: { message },
-      }) as { signature: string } | null;
-
-      return result?.signature || "";
-    },
-    [provider]
-  );
-
-  const signAndSendTransaction = useCallback(
-    async (transaction: object): Promise<string> => {
-      if (!provider) throw new Error("Provider not connected");
-
-      const result = await provider.request({
-        method: "xrpl_submitTransaction",
-        params: { transaction },
-      }) as { hash: string } | null;
-
-      return result?.hash || "";
-    },
-    [provider]
-  );
+  const signAndSendTransaction = async (tx: object) => {
+    if (!user) throw new Error("User not authenticated");
+    return walletManager.signAndSubmit(user.id.toString(), tx);
+  };
 
   const value: XrplWalletContextType = {
-    isConnected: !!address && !!walletData,
+    isConnected: !!address,
     isInitialized,
     isConnecting,
     address,
     walletData,
     connect,
     disconnect,
+    fundWallet,
     getAccounts,
     getBalance,
     signMessage,
     signAndSendTransaction,
-    provider,
+    provider: null, // Web3Auth provider is removed
   };
 
   return <XrplWalletContext.Provider value={value}>{children}</XrplWalletContext.Provider>;
