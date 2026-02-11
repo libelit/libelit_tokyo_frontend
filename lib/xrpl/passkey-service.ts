@@ -27,8 +27,13 @@ export const passkeyService = {
 
     // Check if the device supports WebAuthn
     async isSupported(): Promise<boolean> {
+        if (typeof window === 'undefined') return false;
+
+        // WebAuthn requires a secure context (HTTPS) or localhost
+        const isSecureContext = window.isSecureContext;
+
         return (
-            typeof window !== 'undefined' &&
+            isSecureContext &&
             !!(window as any).PublicKeyCredential
         );
     },

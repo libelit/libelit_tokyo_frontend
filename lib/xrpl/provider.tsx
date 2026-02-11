@@ -100,7 +100,7 @@ export function XrplWalletProvider({ children }: { children: ReactNode }) {
       // 1. Passkey Registration / Auth
       const isSupported = await passkeyService.isSupported();
       if (!isSupported) {
-        throw new Error("Passkeys are not supported on this device.");
+        throw new Error("Passkeys are not supported on this device. Ensure you are using HTTPS or localhost.");
       }
 
       // Check if we already have a wallet locally for this user
