@@ -139,6 +139,7 @@ export default function MarketplacePage() {
     try {
       const response = await lenderProjectsService.list({
         search: search || undefined,
+        status: "listed",
         per_page: 50,
       });
       if (response.data?.success) {

@@ -116,12 +116,14 @@ export const lenderKybService = {
 export const lenderProjectsService = {
   async list(params?: {
     search?: string;
+    status?: string;
     project_type?: string;
     per_page?: number;
     page?: number;
   }): Promise<ApiResponse<LenderProjectListResponse>> {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.append("search", params.search);
+    if (params?.status) searchParams.append("status", params.status);
     if (params?.project_type) searchParams.append("project_type", params.project_type);
     if (params?.per_page) searchParams.append("per_page", params.per_page.toString());
     if (params?.page) searchParams.append("page", params.page.toString());
