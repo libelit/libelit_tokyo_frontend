@@ -121,15 +121,15 @@ export default function ProjectDetailsPage() {
   const projectPhotos = project?.photos || [];
   const aboutGalleryImages = projectPhotos.length > 0
     ? projectPhotos.map((photo) => ({
-        id: photo.id,
-        title: photo.title || "Project image",
-        src: photo.file_url,
-      }))
+      id: photo.id,
+      title: photo.title || "Project image",
+      src: photo.file_url,
+    }))
     : [
-        { id: 1, title: "Front view", src: "/images/house.png" },
-        { id: 2, title: "Side view", src: "/images/house.png" },
-        { id: 3, title: "Interior", src: "/images/house.png" },
-      ];
+      { id: 1, title: "Front view", src: "/images/house.png" },
+      { id: 2, title: "Side view", src: "/images/house.png" },
+      { id: 3, title: "Interior", src: "/images/house.png" },
+    ];
 
   const nextAboutImage = () => {
     setAboutImageIndex((prev) => (prev + 1) % aboutGalleryImages.length);
@@ -168,7 +168,16 @@ export default function ProjectDetailsPage() {
         setProposalSubmitted(true);
         toast.success(response.data.message || "Loan proposal submitted successfully");
       } else if (response.error) {
-        toast.error(response.error);
+        // Display validation errors if available
+        if (response.errors) {
+          Object.entries(response.errors).forEach(([field, messages]) => {
+            messages.forEach((message: string) => {
+              toast.error(message);
+            });
+          });
+        } else {
+          toast.error(response.error);
+        }
       }
     } catch (error) {
       console.error("Error submitting proposal:", error);
@@ -349,11 +358,10 @@ export default function ProjectDetailsPage() {
               <button
                 key={tab.id}
                 onClick={() => scrollToSection(tab.id, tab.ref)}
-                className={`py-4 cursor-pointer text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
+                className={`py-4 cursor-pointer text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
                     ? "text-[#E86A33] border-[#E86A33]"
                     : "text-gray-500 border-transparent hover:text-[#E86A33] hover:border-[#E86A33]"
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -410,9 +418,8 @@ export default function ProjectDetailsPage() {
                         <button
                           key={index}
                           onClick={() => setAboutImageIndex(index)}
-                          className={`w-2 h-2 rounded-full transition-colors ${
-                            index === aboutImageIndex ? "bg-gray-800" : "bg-gray-300"
-                          }`}
+                          className={`w-2 h-2 rounded-full transition-colors ${index === aboutImageIndex ? "bg-gray-800" : "bg-gray-300"
+                            }`}
                         />
                       ))}
                     </div>
@@ -701,11 +708,10 @@ export default function ProjectDetailsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => setShowAISummaryFor(showAISummaryFor === doc.id ? null : doc.id)}
-                          className={`text-xs gap-1.5 ${
-                            showAISummaryFor === doc.id
+                          className={`text-xs gap-1.5 ${showAISummaryFor === doc.id
                               ? "bg-violet-100 border-violet-300 text-violet-700"
                               : "bg-gradient-to-r from-violet-50 to-purple-50 border-violet-200 hover:from-violet-100 hover:to-purple-100 text-violet-700"
-                          }`}
+                            }`}
                         >
                           <Sparkles className="h-3 w-3" />
                           AI Review
@@ -761,12 +767,11 @@ export default function ProjectDetailsPage() {
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
                         <h4 className="font-medium">{milestone.title}</h4>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          milestone.status === "paid" ? "bg-green-100 text-green-700" :
-                          milestone.status === "approved" ? "bg-blue-100 text-blue-700" :
-                          milestone.status === "proof_submitted" ? "bg-amber-100 text-amber-700" :
-                          "bg-gray-100 text-gray-700"
-                        }`}>
+                        <span className={`text-xs px-2 py-1 rounded-full ${milestone.status === "paid" ? "bg-green-100 text-green-700" :
+                            milestone.status === "approved" ? "bg-blue-100 text-blue-700" :
+                              milestone.status === "proof_submitted" ? "bg-amber-100 text-amber-700" :
+                                "bg-gray-100 text-gray-700"
+                          }`}>
                           {milestone.status_label}
                         </span>
                       </div>

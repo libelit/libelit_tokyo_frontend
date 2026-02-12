@@ -1,5 +1,6 @@
 import { Client, Wallet, encodeMPTokenMetadata, decodeMPTokenMetadata, MPTokenIssuanceCreateFlags } from 'xrpl';
-import { XRPL_NETWORK } from './config';
+import { XRPL_NETWORK, XRPL_CLIENT_OPTIONS } from './config';
+
 
 const NETWORKS = {
     mainnet: "wss://xrplcluster.com",
@@ -45,10 +46,17 @@ export const mptService = {
     async createMPTokenIssuance(params: CreateMPTParams): Promise<MPTIssuanceResult> {
         const { wallet, metadata, maximumAmount, assetScale = 4, transferFee = 0 } = params;
 
-        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS]);
+        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS], XRPL_CLIENT_OPTIONS);
 
         try {
-            await client.connect();
+            try {
+                await client.connect();
+            } catch (error: any) {
+                if (error?.message?.includes('timed out') || error?.name === 'NotConnectedError') {
+                    throw new Error("Unable to connect to XRPL network. The server may be overloaded. Please try again later.");
+                }
+                throw error;
+            }
             console.log('Connected to XRPL network:', XRPL_NETWORK);
 
             // Encode metadata according to XLS-89 standard
@@ -130,10 +138,15 @@ export const mptService = {
      * Get MPToken balance for an address
      */
     async getMPTokenBalance(address: string, mptIssuanceID: string): Promise<string> {
-        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS]);
+        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS], XRPL_CLIENT_OPTIONS);
 
         try {
-            await client.connect();
+            try {
+                await client.connect();
+            } catch (error: any) {
+                console.warn("Failed to connect for MPToken balance:", error);
+                return '0';
+            }
 
             // Query account's MPToken objects
             const response = await client.request({
@@ -158,10 +171,15 @@ export const mptService = {
      * Get all MPToken issuances created by an address
      */
     async getMPTokenIssuances(address: string): Promise<any[]> {
-        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS]);
+        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS], XRPL_CLIENT_OPTIONS);
 
         try {
-            await client.connect();
+            try {
+                await client.connect();
+            } catch (error: any) {
+                console.warn("Failed to connect for MPToken issuances:", error);
+                return [];
+            }
 
             // Query account's MPTokenIssuance objects
             const response = await client.request({

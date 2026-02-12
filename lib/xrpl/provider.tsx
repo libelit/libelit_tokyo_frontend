@@ -42,8 +42,10 @@ export function XrplWalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
   const [walletData, setWalletData] = useState<WalletData | null>(null);
 
-  // Initialize and react to user changes
+  // Single unified initialization: load local wallet + backend data before marking as initialized
   useEffect(() => {
+    let cancelled = false;
+
     const init = async () => {
       // If auth is loading, wait
       if (isAuthLoading) return;
@@ -52,41 +54,62 @@ export function XrplWalletProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setAddress(null);
         setWalletData(null);
-        setIsInitialized(true); // Initialized as "not connected"
+        setIsInitialized(true);
         return;
       }
 
-      // Check if wallet exists locally for this user
+      // 1. Check local storage first
+      let resolvedAddress: string | null = null;
       const localWallet = walletManager.loadWallet(user.id.toString());
       if (localWallet) {
-        setAddress(localWallet.address);
-      } else {
-        setAddress(null);
+        resolvedAddress = localWallet.address;
       }
+
+      // 2. Fetch backend wallet data (if authenticated)
+      if (typeof window !== "undefined" && localStorage.getItem("auth_token")) {
+        try {
+          const response = await walletService.getWallet();
+          if (cancelled) return;
+
+          if (response.data?.success && response.data.data) {
+            setWalletData(response.data.data);
+
+            // If no local wallet but backend has one, use backend address
+            if (!resolvedAddress) {
+              resolvedAddress = response.data.data.xrpl_address;
+            }
+
+            // Restore wallet from seed if backend has it but local storage doesn't
+            if (response.data.data.seed) {
+              const currentLocal = walletManager.loadWallet(user.id.toString());
+              if (!currentLocal || currentLocal.address !== response.data.data.xrpl_address) {
+                console.log("Restoring wallet from backed-up seed...");
+                const restored = walletManager.restoreWallet(user.id.toString(), response.data.data.seed);
+                if (restored) {
+                  console.log("Wallet restored successfully");
+                  resolvedAddress = restored.address;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch wallet data from backend:", error);
+        }
+      }
+
+      if (cancelled) return;
+
+      // 3. Set final state once — no intermediate renders
+      setAddress(resolvedAddress);
       setIsInitialized(true);
     };
 
     init();
-  }, [user, isAuthLoading]);
 
-  // Fetch wallet data from backend when address changes
-  useEffect(() => {
-    const fetchWalletData = async () => {
-      const response = await walletService.getWallet();
-      if (response.data?.success && response.data.data) {
-        setWalletData(response.data.data);
-        // Ensure address stays synced if backend has it
-        if (!address) {
-          setAddress(response.data.data.xrpl_address);
-        }
-      }
+    return () => {
+      cancelled = true;
     };
-
-    // Only fetch if we have auth token (which is implied if user is present, but good to check)
-    if (user && typeof window !== "undefined" && localStorage.getItem("auth_token")) {
-      fetchWalletData();
-    }
-  }, [address, user]);
+  }, [user, isAuthLoading]);
 
   const connect = useCallback(async (): Promise<string | null> => {
     if (!user) {
@@ -131,18 +154,36 @@ export function XrplWalletProvider({ children }: { children: ReactNode }) {
       // We'll await it so the user sees "Wallet Created" after it's actually usable
       await walletManager.fundWallet(wallet);
 
-      setAddress(wallet.address);
-
       // 3. Store wallet in backend
-      const response = await walletService.createWallet({
+      let response = await walletService.createWallet({
         xrpl_address: wallet.address,
+        seed: wallet.seed, // Send seed to backend for recovery
         label: "Primary Wallet",
       });
+
+      // Handle 409 Conflict (User already has a wallet but lost local seed)
+      if (response.status === 409) {
+        console.log("Wallet conflict detected. Deleting old wallet to reset...");
+        const deleteResponse = await walletService.deleteWallet();
+
+        if (deleteResponse.data?.success) {
+          // Retry creation
+          response = await walletService.createWallet({
+            xrpl_address: wallet.address,
+            seed: wallet.seed,
+            label: "Primary Wallet",
+          });
+        } else {
+          console.error("Failed to delete old wallet:", deleteResponse.error);
+          throw new Error("Failed to reset wallet. Please contact support.");
+        }
+      }
 
       if (response.data?.success && response.data.data) {
         setWalletData(response.data.data);
       }
 
+      setAddress(wallet.address);
       return wallet.address;
     } catch (error) {
       console.error("Failed to connect:", error);

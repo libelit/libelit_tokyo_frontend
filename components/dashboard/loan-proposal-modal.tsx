@@ -76,6 +76,7 @@ export function LoanProposalModal({
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -178,7 +179,8 @@ export function LoanProposalModal({
     formData.maturityDate &&
     securityPackage.length > 0 &&
     formData.maxLTV &&
-    formData.bidExpiry;
+    formData.bidExpiry &&
+    documents.length > 0; // Loan term agreement is required
 
   // Success State
   if (isSubmitted) {
@@ -382,11 +384,16 @@ export function LoanProposalModal({
           {/* Document Upload */}
           <div className="space-y-2">
             <Label>
-              Loan Term Agreement <span className="text-gray-400">(optional)</span>
+              Loan Term Agreement <span className="text-red-500">*</span>
             </Label>
             <p className="text-xs text-gray-500">
-              Upload loan term agreements, bank statements, or other relevant documents
+              Upload the loan term agreement document (PDF or image file)
             </p>
+            {errors.loan_term_agreement && (
+              <p className="text-xs text-red-600 font-medium">
+                {errors.loan_term_agreement}
+              </p>
+            )}
 
             <div
               className={cn(

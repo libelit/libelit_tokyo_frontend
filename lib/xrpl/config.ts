@@ -37,3 +37,6 @@ export function getChainConfig() {
   return XRPL_CHAIN_CONFIG[XRPL_NETWORK as keyof typeof XRPL_CHAIN_CONFIG] || XRPL_CHAIN_CONFIG.testnet;
 }
 
+export const XRPL_CLIENT_OPTIONS = {
+  connectionTimeout: 10000, // 10 seconds timeout
+};

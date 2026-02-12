@@ -458,7 +458,7 @@ export interface CreateLenderProposalRequest {
   max_ltv_accepted: number;
   bid_expiry_date: string;
   additional_conditions?: string;
-  loan_term_agreement?: File;
+  loan_term_agreement: File;
 }
 
 export interface CreateLenderProposalResponse {

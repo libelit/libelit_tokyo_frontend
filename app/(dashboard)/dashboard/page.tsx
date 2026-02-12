@@ -76,6 +76,7 @@ export default function DashboardPage() {
   const [latestProjectData, setLatestProjectData] = useState<LenderProject | null>(null);
   const [stats, setStats] = useState({ totalBalance: 0, submittedBids: 0, approvedLoans: 0 });
   const [chartData, setChartData] = useState<{ date: string; value: number }[]>([]);
+  const [loanProposals, setLoanProposals] = useState<LenderLoanProposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showTokenizeDialog, setShowTokenizeDialog] = useState(false);
 
@@ -94,6 +95,7 @@ export default function DashboardPage() {
       const proposalsResponse = await lenderProposalsService.list({ status: "all", per_page: 100 });
       if (proposalsResponse.data?.success) {
         const proposals = proposalsResponse.data.data;
+        setLoanProposals(proposals);
         const submittedBids = proposals.filter(p =>
           p.status === "submitted_by_lender" || p.status === "under_review_by_developer"
         ).length;
@@ -178,7 +180,16 @@ export default function DashboardPage() {
           {/* Portfolio Table */}
           <div className="space-y-2">
             {/*<h2 className="text-lg font-semibold">Portfolio summary</h2>*/}
-            {/*<PortfolioTable projects={[]} />*/}
+            <PortfolioTable projects={loanProposals.filter(p =>
+              ["accepted_by_developer", "signed_by_developer", "signed_by_lender", "loan_term_fully_executed"].includes(p.status)
+            ).map(p => ({
+              id: p.project.id.toString(),
+              name: p.project.title,
+              noOfTokens: 1,
+              tokenValue: p.loan_amount_offered,
+              totalValue: p.loan_amount_offered,
+              fulfilment: Math.round((p.project.amount_raised / p.project.loan_amount) * 100) || 0
+            }))} />
           </div>
         </div>
         <div className="space-y-2">

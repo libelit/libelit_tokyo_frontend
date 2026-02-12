@@ -1,5 +1,6 @@
 import { Wallet, Client } from 'xrpl';
-import { XRPL_NETWORK } from './config';
+import { XRPL_NETWORK, XRPL_CLIENT_OPTIONS } from './config';
+
 
 const STORAGE_KEY_PREFIX = 'libelit_xrpl_wallet_seed_';
 
@@ -40,6 +41,18 @@ export const walletManager = {
         }
     },
 
+    // Restore wallet from seed
+    restoreWallet(userId: string, seed: string): Wallet | null {
+        try {
+            const wallet = Wallet.fromSeed(seed);
+            this.saveWallet(userId, wallet);
+            return wallet;
+        } catch (error) {
+            console.error("Failed to restore wallet:", error);
+            return null;
+        }
+    },
+
     // Check if a wallet exists locally
     hasWallet(userId: string): boolean {
         if (typeof window === 'undefined') return false;
@@ -62,8 +75,17 @@ export const walletManager = {
         const wallet = this.loadWallet(userId);
         if (!wallet) throw new Error("No wallet found");
 
-        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS]);
-        await client.connect();
+        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS], XRPL_CLIENT_OPTIONS);
+
+        try {
+            await client.connect();
+        } catch (error: any) {
+            console.error("Connection failed:", error);
+            if (error?.message?.includes('timed out') || error?.name === 'NotConnectedError') {
+                throw new Error("Unable to connect to XRPL network. The server may be overloaded or unreachable. Please try again later.");
+            }
+            throw new Error("Failed to connect to XRPL network");
+        }
 
         try {
             // Cast transaction to any to avoid strict Transaction type checks for now, 
@@ -90,8 +112,14 @@ export const walletManager = {
         const network = XRPL_NETWORK as keyof typeof NETWORKS;
         if (network === 'mainnet') return;
 
-        const client = new Client(NETWORKS[network]);
-        await client.connect();
+        const client = new Client(NETWORKS[network], XRPL_CLIENT_OPTIONS);
+
+        try {
+            await client.connect();
+        } catch (error) {
+            console.error("Fund wallet connection failed:", error);
+            return; // Fail silently/gracefully for funding if network is down, user can retry
+        }
 
         try {
             console.log('\nFunding wallet from testnet faucet...');
@@ -107,17 +135,35 @@ export const walletManager = {
 
     // Get wallet balance
     async getBalance(address: string): Promise<string> {
-        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS]);
-        await client.connect();
+        const client = new Client(NETWORKS[XRPL_NETWORK as keyof typeof NETWORKS], XRPL_CLIENT_OPTIONS);
 
         try {
+            await client.connect();
             const balance = await client.getXrpBalance(address);
             return balance.toString();
-        } catch (error) {
+        } catch (error: any) {
+            // Handle specific error cases gracefully
+            if (error?.data?.error === 'actNotFound' || error?.message?.includes('Account not found')) {
+                // Account hasn't been activated yet (needs initial funding)
+                console.log('Account not yet activated on ledger');
+                return '0';
+            }
+
+            if (error?.message?.includes('timed out') || error?.message?.includes('connect()')) {
+                // Connection timeout - network issue
+                console.warn('Connection timeout - unable to fetch balance');
+                return '0';
+            }
+
+            // Log other errors but don't throw
             console.error("Failed to fetch balance:", error);
             return "0";
         } finally {
-            await client.disconnect();
+            try {
+                await client.disconnect();
+            } catch (disconnectError) {
+                // Ignore disconnect errors
+            }
         }
     }
 };

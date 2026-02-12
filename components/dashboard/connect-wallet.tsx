@@ -10,13 +10,13 @@ import { Fingerprint, CheckCircle, Wallet } from "lucide-react";
 export function ConnectWallet() {
   const { isConnected, address, isInitialized } = useXrplWallet();
   const [showSetupModal, setShowSetupModal] = useState(false);
+  const { user } = useAuth(); // Get user to determine dashboard path
 
   // Don't show anything while loading
   if (!isInitialized) {
     return null;
   }
 
-  const { user } = useAuth(); // Get user to determine dashboard path
   const walletPath = user?.type === "developer" ? "/developer/dashboard/wallet" : "/dashboard/wallet";
 
   // Show connected state

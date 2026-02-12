@@ -23,7 +23,7 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [txHash, setTxHash] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const { address } = useXrplWallet();
+    const { address, connect } = useXrplWallet();
     const { user } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -45,9 +45,10 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
 
         try {
             // Load wallet from local storage
-            const wallet = walletManager.loadWallet(user.id.toString());
+            let wallet = walletManager.loadWallet(user.id.toString());
+
             if (!wallet) {
-                throw new Error("Wallet not found. Please connect your wallet first.");
+                throw new Error(`Wallet capability missing. Please try reconnecting your wallet.`);
             }
 
             // Create metadata for the project
@@ -93,7 +94,7 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px] gap-0">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Coins className="h-5 w-5 text-[#E86A33]" />
@@ -105,7 +106,7 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
                 </DialogHeader>
 
                 {txHash ? (
-                    <div className="space-y-4 py-4">
+                    <div className="space-y-4 px-6 py-4">
                         <div className="flex items-center justify-center py-6">
                             <CheckCircle2 className="h-16 w-16 text-green-500" />
                         </div>
@@ -114,14 +115,14 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
                             <p className="text-sm text-muted-foreground">
                                 Your Multi-Purpose Tokens have been minted to your wallet.
                             </p>
-                            <div className="bg-muted p-3 rounded-lg text-xs font-mono break-all">
+                            <div className="bg-muted p-3 rounded-lg text-xs font-mono break-all mt-4">
                                 {txHash}
                             </div>
                             {explorerUrl && (
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="mt-2"
+                                    className="mt-4 w-full"
                                     onClick={() => window.open(explorerUrl, '_blank')}
                                 >
                                     View on XRPL Explorer
@@ -131,10 +132,10 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
                         </div>
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit}>
-                        <div className="space-y-4 py-4">
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-0">
+                        <div className="space-y-4 px-6 py-2">
                             {project && (
-                                <div className="bg-muted p-3 rounded-lg space-y-1">
+                                <div className="bg-muted/50 border p-3 rounded-lg space-y-1">
                                     <p className="text-sm font-medium">{project.title}</p>
                                     <p className="text-xs text-muted-foreground">
                                         {project.city}, {project.country}
@@ -154,6 +155,7 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
                                     step="1"
                                     disabled={isSubmitting}
                                     required
+                                    className="h-10"
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     Number of MPT tokens to mint for this project
@@ -161,13 +163,33 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
                             </div>
 
                             {error && (
-                                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                    <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                                    <p className="text-sm text-red-600">{error}</p>
+                                <div className="flex flex-col gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <div className="flex items-start gap-2">
+                                        <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                        <p className="text-sm text-red-600">{error}</p>
+                                    </div>
+                                    {error.includes("reconnecting") && (
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={async () => {
+                                                try {
+                                                    await connect();
+                                                    setError(null);
+                                                } catch (e) {
+                                                    console.error("Reconnection failed:", e);
+                                                }
+                                            }}
+                                            className="ml-6 bg-red-100 text-red-700 hover:bg-red-200 w-fit"
+                                        >
+                                            Reconnect Wallet
+                                        </Button>
+                                    )}
                                 </div>
                             )}
 
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
+                            <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 space-y-1">
                                 <p className="text-xs font-medium text-blue-900">About MPT Tokens</p>
                                 <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
                                     <li>Tokens represent fractional ownership</li>
@@ -178,7 +200,7 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
                             </div>
                         </div>
 
-                        <DialogFooter>
+                        <DialogFooter className="mt-2">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -195,7 +217,7 @@ export function TokenizeProjectDialog({ open, onOpenChange, project }: TokenizeP
                                 {isSubmitting ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Creating MPT...
+                                        Creating...
                                     </>
                                 ) : (
                                     "Create MPT"

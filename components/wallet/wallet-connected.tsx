@@ -147,14 +147,31 @@ export function WalletConnected() {
           <Button
             variant="secondary"
             className="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"
+            disabled={isLoadingBalance}
             onClick={async () => {
               setIsLoadingBalance(true);
-              await fundWallet();
-              await fetchBalance();
-              setIsLoadingBalance(false);
+              try {
+                await fundWallet();
+                // Wait a moment for the transaction to settle
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                await fetchBalance();
+              } catch (error) {
+                console.error("Failed to fund wallet:", error);
+                // Still try to fetch balance in case it partially succeeded
+                await fetchBalance();
+              } finally {
+                setIsLoadingBalance(false);
+              }
             }}
           >
-            Fund (Testnet)
+            {isLoadingBalance ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Funding...
+              </>
+            ) : (
+              "Fund (Testnet)"
+            )}
           </Button>
         )}
       </div>

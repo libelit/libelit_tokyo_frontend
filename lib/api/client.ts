@@ -3,6 +3,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 export interface ApiResponse<T> {
   data: T | null;
   error: string | null;
+  errors?: Record<string, string[]>; // Laravel validation errors
   status: number;
 }
 
@@ -105,7 +106,9 @@ class ApiClient {
   async upload<T>(endpoint: string, formData: FormData, options?: RequestInit): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
 
-    const headers: HeadersInit = {};
+    const headers: HeadersInit = {
+      "Accept": "application/json", // Tell Laravel to return JSON, not redirect
+    };
 
     // Add auth token if available (don't set Content-Type, let browser set it with boundary)
     if (typeof window !== "undefined") {

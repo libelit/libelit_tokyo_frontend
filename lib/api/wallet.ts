@@ -4,6 +4,7 @@ export interface WalletData {
   id: number;
   xrpl_address: string;
   xrpl_public_key: string | null;
+  seed?: string; // Encrypted seed from backend
   label: string;
   is_primary: boolean;
   is_verified: boolean;
@@ -20,6 +21,7 @@ export interface WalletResponse {
 export interface CreateWalletRequest {
   xrpl_address: string;
   xrpl_public_key?: string;
+  seed?: string;
   label?: string;
 }
 
