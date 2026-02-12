@@ -197,7 +197,7 @@ export default function ProjectDetailsPage() {
     loadData();
   }, [fetchProject, fetchDocuments, fetchMilestones, fetchPhotos]);
 
-  const canEdit = project?.status === "draft" || project?.status === "rejected";
+  const canEdit = project?.status === "draft" || project?.status === "rejected" || project?.status === "submitted";
   const canSubmit = project?.status === "draft";
 
   // Get document for a checklist item
@@ -694,6 +694,26 @@ export default function ProjectDetailsPage() {
                 {project.description || "No description provided."}
               </p>
             </div>
+
+            {/* VR Tour & Live Camera Links */}
+            {(project.vr_tour_link || project.live_camera_link) && (
+              <div className="rounded-xl border bg-white p-6 shadow-sm">
+                <dl className="space-y-4">
+                  {project.vr_tour_link && (
+                    <div>
+                      <dt className="text-sm text-gray-500">VR Tour</dt>
+                      <dd className="font-medium text-sm break-all">{project.vr_tour_link}</dd>
+                    </div>
+                  )}
+                  {project.live_camera_link && (
+                    <div>
+                      <dt className="text-sm text-gray-500">Live Camera</dt>
+                      <dd className="font-medium text-sm break-all">{project.live_camera_link}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            )}
 
             {/* Location Details */}
             <div className="rounded-xl border bg-white p-6 shadow-sm">

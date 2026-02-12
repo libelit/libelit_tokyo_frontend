@@ -138,6 +138,8 @@ export default function ProjectsPage() {
     status: project.status,
     createdAt: project.created_at,
     imageUrl: project.cover_photo_url ?? undefined,
+    vrTourLink: project.vr_tour_link,
+    liveCameraLink: project.live_camera_link,
     onDelete: project.status === "draft" ? handleDeleteProject : undefined,
   });
 
