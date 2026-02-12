@@ -177,8 +177,8 @@ export default function DashboardPage() {
           </div>
           {/* Portfolio Table */}
           <div className="space-y-2">
-            <h2 className="text-lg font-semibold">Portfolio summary</h2>
-            <PortfolioTable projects={[]} />
+            {/*<h2 className="text-lg font-semibold">Portfolio summary</h2>*/}
+            {/*<PortfolioTable projects={[]} />*/}
           </div>
         </div>
         <div className="space-y-2">

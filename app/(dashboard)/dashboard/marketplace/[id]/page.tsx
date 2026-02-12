@@ -459,24 +459,30 @@ export default function ProjectDetailsPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  className="rounded-full px-5 cursor-pointer"
-                  onClick={() => setShowVRTour(true)}
-                >
-                  VR tour
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  className="rounded-full px-5 cursor-pointer"
-                  onClick={() => setShowLiveCamera(true)}
-                >
-                  Live camera
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
+              {(project.vr_tour_link || project.live_camera_link) && (
+                <div className="flex gap-3 pt-4">
+                  {project.vr_tour_link && (
+                    <Button
+                      variant="outline"
+                      className="rounded-full px-5 cursor-pointer"
+                      onClick={() => setShowVRTour(true)}
+                    >
+                      VR tour
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  )}
+                  {project.live_camera_link && (
+                    <Button
+                      variant="outline"
+                      className="rounded-full px-5 cursor-pointer"
+                      onClick={() => setShowLiveCamera(true)}
+                    >
+                      Live camera
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -788,7 +794,7 @@ export default function ProjectDetailsPage() {
       </div>
 
       {/* VR Tour Modal */}
-      {showVRTour && (
+      {showVRTour && project.vr_tour_link && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="relative bg-white rounded-xl overflow-hidden max-w-4xl w-full mx-4">
             {/* Modal Header */}
@@ -808,7 +814,7 @@ export default function ProjectDetailsPage() {
                 scrolling="no"
                 allowFullScreen
                 allow="gyroscope; accelerometer; xr-spatial-tracking; vr;"
-                src="https://naniby.shapespark.com/libelit_osadnicza_preview_05/#help"
+                src={project.vr_tour_link}
               />
             </div>
           </div>
@@ -816,7 +822,7 @@ export default function ProjectDetailsPage() {
       )}
 
       {/* Live Camera Modal */}
-      {showLiveCamera && (
+      {showLiveCamera && project.live_camera_link && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="relative bg-white rounded-xl overflow-hidden max-w-4xl w-full mx-4">
             {/* Modal Header */}
@@ -834,7 +840,7 @@ export default function ProjectDetailsPage() {
               <iframe
                 className="w-full h-full border-none"
                 allowFullScreen
-                src="https://streaming.airmax.pl/osadniczaspolka/embed.html"
+                src={project.live_camera_link}
               />
             </div>
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, MapPin, Calendar, DollarSign, MoreVertical, Eye, Edit, Trash2 } from "lucide-react";
+import { Building2, MapPin, Calendar, DollarSign, MoreVertical, Eye, Edit, Trash2, Video, View } from "lucide-react";
 import { ProjectStatusBadge, ProjectStatus } from "./project-status-badge";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
@@ -15,6 +15,8 @@ interface ProjectCardProps {
   status: ProjectStatus;
   createdAt: string;
   imageUrl?: string;
+  vrTourLink?: string | null;
+  liveCameraLink?: string | null;
   onDelete?: (id: number) => void;
 }
 
@@ -27,6 +29,8 @@ export function ProjectCard({
   status,
   createdAt,
   imageUrl,
+  vrTourLink,
+  liveCameraLink,
   onDelete,
 }: ProjectCardProps) {
   const [showMenu, setShowMenu] = useState(false);
@@ -43,7 +47,7 @@ export function ProjectCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const canEdit = status === "draft" || status === "rejected";
+  const canEdit = status === "draft" || status === "rejected" || status === "submitted";
   const canDelete = status === "draft";
 
   return (
@@ -119,6 +123,23 @@ export function ProjectCard({
           <MapPin className="h-3.5 w-3.5" />
           <span className="line-clamp-1">{location}</span>
         </div>
+
+        {(vrTourLink || liveCameraLink) && (
+          <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
+            {vrTourLink && (
+              <div className="flex items-center gap-1">
+                <View className="h-3.5 w-3.5 text-[#E86A33]" />
+                <span>VR Tour</span>
+              </div>
+            )}
+            {liveCameraLink && (
+              <div className="flex items-center gap-1">
+                <Video className="h-3.5 w-3.5 text-[#E86A33]" />
+                <span>Live Camera</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center justify-between mt-4 pt-4 border-t">
           <div className="flex items-center gap-1">

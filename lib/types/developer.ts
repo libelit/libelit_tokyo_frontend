@@ -110,6 +110,8 @@ export interface Project {
   photos?: ProjectPhoto[];
   cover_photo?: ProjectPhoto | null;
   cover_photo_url?: string | null;
+  vr_tour_link: string | null;
+  live_camera_link: string | null;
 }
 
 export type ProjectType = 'residential' | 'commercial' | 'mixed_use' | 'industrial' | 'land';
@@ -135,6 +137,8 @@ export interface CreateProjectRequest {
   currency: string;
   construction_start_date: string;
   construction_end_date: string;
+  vr_tour_link?: string;
+  live_camera_link?: string;
 }
 
 export interface UpdateProjectRequest {
@@ -149,6 +153,8 @@ export interface UpdateProjectRequest {
   currency?: string;
   construction_start_date?: string;
   construction_end_date?: string;
+  vr_tour_link?: string;
+  live_camera_link?: string;
 }
 
 // API Response Types

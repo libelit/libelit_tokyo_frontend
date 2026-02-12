@@ -61,6 +61,8 @@ interface ProjectFormData {
   title: string;
   projectType: ProjectType | "";
   description: string;
+  vrTourLink: string;
+  liveCameraLink: string;
   // Step 2: Location
   address: string;
   city: string;
@@ -81,6 +83,8 @@ const initialFormData: ProjectFormData = {
   title: "",
   projectType: "",
   description: "",
+  vrTourLink: "",
+  liveCameraLink: "",
   address: "",
   city: "",
   country: "United Kingdom",
@@ -261,6 +265,8 @@ export default function CreateProjectPage() {
       currency: formData.currency,
       construction_start_date: formData.constructionStartDate,
       construction_end_date: formData.constructionEndDate,
+      ...(formData.vrTourLink ? { vr_tour_link: formData.vrTourLink } : {}),
+      ...(formData.liveCameraLink ? { live_camera_link: formData.liveCameraLink } : {}),
     };
   };
 
@@ -477,6 +483,28 @@ export default function CreateProjectPage() {
                 {errors.description && (
                   <p className="text-sm text-red-500 mt-1">{errors.description}</p>
                 )}
+              </div>
+
+              <div>
+                <Label htmlFor="vrTourLink">VR Tour Link</Label>
+                <Input
+                  id="vrTourLink"
+                  type="url"
+                  placeholder="e.g., https://example.com/vr-tour"
+                  value={formData.vrTourLink}
+                  onChange={(e) => updateFormData("vrTourLink", e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="liveCameraLink">Live Camera Link</Label>
+                <Input
+                  id="liveCameraLink"
+                  type="url"
+                  placeholder="e.g., https://example.com/live-camera"
+                  value={formData.liveCameraLink}
+                  onChange={(e) => updateFormData("liveCameraLink", e.target.value)}
+                />
               </div>
             </div>
           </div>
@@ -832,6 +860,18 @@ export default function CreateProjectPage() {
                     <dt className="text-gray-500">Description</dt>
                     <dd className="font-medium">{formData.description}</dd>
                   </div>
+                  {formData.vrTourLink && (
+                    <div className="col-span-2">
+                      <dt className="text-gray-500">VR Tour Link</dt>
+                      <dd className="font-medium">{formData.vrTourLink}</dd>
+                    </div>
+                  )}
+                  {formData.liveCameraLink && (
+                    <div className="col-span-2">
+                      <dt className="text-gray-500">Live Camera Link</dt>
+                      <dd className="font-medium">{formData.liveCameraLink}</dd>
+                    </div>
+                  )}
                 </dl>
               </div>
 

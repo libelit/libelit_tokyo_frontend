@@ -297,6 +297,8 @@ export interface LenderProject {
   cover_photo_url: string | null;
   photos: LenderProjectPhoto[];
   photos_count: number;
+  vr_tour_link: string | null;
+  live_camera_link: string | null;
 }
 
 export interface LenderProjectListResponse {

@@ -36,6 +36,8 @@ interface ProjectFormData {
   title: string;
   projectType: ProjectType | "";
   description: string;
+  vrTourLink: string;
+  liveCameraLink: string;
   address: string;
   city: string;
   country: string;
@@ -60,6 +62,8 @@ export default function EditProjectPage() {
     title: "",
     projectType: "",
     description: "",
+    vrTourLink: "",
+    liveCameraLink: "",
     address: "",
     city: "",
     country: "",
@@ -96,7 +100,7 @@ export default function EditProjectPage() {
           setProject(p);
 
           // Check if project can be edited
-          if (p.status !== "draft" && p.status !== "rejected") {
+          if (p.status !== "draft" && p.status !== "rejected" && p.status !== "submitted") {
             toast.error("This project cannot be edited");
             router.push(`/developer/dashboard/projects/${projectId}`);
             return;
@@ -107,6 +111,8 @@ export default function EditProjectPage() {
             title: p.title,
             projectType: p.project_type,
             description: p.description || "",
+            vrTourLink: p.vr_tour_link || "",
+            liveCameraLink: p.live_camera_link || "",
             address: p.address || "",
             city: p.city || "",
             country: p.country || "",
@@ -248,6 +254,8 @@ export default function EditProjectPage() {
         currency: formData.currency,
         construction_start_date: formData.constructionStartDate,
         construction_end_date: formData.constructionEndDate,
+        ...(formData.vrTourLink ? { vr_tour_link: formData.vrTourLink } : {}),
+        ...(formData.liveCameraLink ? { live_camera_link: formData.liveCameraLink } : {}),
       };
 
       const response = await projectsService.update(projectId, updateData);
@@ -385,6 +393,28 @@ export default function EditProjectPage() {
               {errors.description && (
                 <p className="text-sm text-red-500 mt-1">{errors.description}</p>
               )}
+            </div>
+
+            <div>
+              <Label htmlFor="vrTourLink">VR Tour Link</Label>
+              <Input
+                id="vrTourLink"
+                type="url"
+                placeholder="e.g., https://example.com/vr-tour"
+                value={formData.vrTourLink}
+                onChange={(e) => updateFormData("vrTourLink", e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="liveCameraLink">Live Camera Link</Label>
+              <Input
+                id="liveCameraLink"
+                type="url"
+                placeholder="e.g., https://example.com/live-camera"
+                value={formData.liveCameraLink}
+                onChange={(e) => updateFormData("liveCameraLink", e.target.value)}
+              />
             </div>
           </div>
         </div>
