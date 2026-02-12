@@ -7,10 +7,11 @@ import { StatsCards } from "@/components/dashboard/stats-cards";
 import { LoansChart } from "@/components/dashboard/loans-chart";
 import { PortfolioTable } from "@/components/dashboard/portfolio-table";
 import { ProjectCard, Project as CardProject } from "@/components/dashboard/project-card";
+import { TokenizeProjectDialog } from "@/components/dashboard/tokenize-project-dialog";
 import { Separator } from "@/components/ui/separator";
 import { lenderProjectsService, lenderProposalsService } from "@/lib/api";
 import type { LenderProject, LenderLoanProposal } from "@/lib/types/lender";
-import { Building2, Loader2 } from "lucide-react";
+import { Building2, Loader2, Coins } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -72,9 +73,11 @@ function mapToCardProject(project: LenderProject): CardProject {
 
 export default function DashboardPage() {
   const [latestProject, setLatestProject] = useState<CardProject | null>(null);
+  const [latestProjectData, setLatestProjectData] = useState<LenderProject | null>(null);
   const [stats, setStats] = useState({ totalBalance: 0, submittedBids: 0, approvedLoans: 0 });
   const [chartData, setChartData] = useState<{ date: string; value: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showTokenizeDialog, setShowTokenizeDialog] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
@@ -82,7 +85,9 @@ export default function DashboardPage() {
       // Fetch latest project from marketplace
       const projectsResponse = await lenderProjectsService.list({ per_page: 1 });
       if (projectsResponse.data?.success && projectsResponse.data.data.length > 0) {
-        setLatestProject(mapToCardProject(projectsResponse.data.data[0]));
+        const project = projectsResponse.data.data[0];
+        setLatestProject(mapToCardProject(project));
+        setLatestProjectData(project);
       }
 
       // Fetch proposals to calculate stats
@@ -133,6 +138,30 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6">
         <div className="space-y-5">
+          {/* Tokenise Project Button */}
+          {stats.approvedLoans > 0 && (
+            <div className="bg-gradient-to-r from-[#E86A33]/10 to-[#E86A33]/5 border border-[#E86A33]/20 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Coins className="h-5 w-5 text-[#E86A33]" />
+                    Tokenise Your Projects
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Create Multi-Purpose Tokens for fractional ownership and secondary markets
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setShowTokenizeDialog(true)}
+                  className="bg-[#E86A33] hover:bg-[#d55a25]"
+                >
+                  <Coins className="mr-2 h-4 w-4" />
+                  Tokenise Project
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Stats Card */}
           <div className="space-y-2">
             <h2 className="text-lg font-semibold">Loans value</h2>
@@ -173,6 +202,12 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      <TokenizeProjectDialog
+        open={showTokenizeDialog}
+        onOpenChange={setShowTokenizeDialog}
+        project={latestProjectData || undefined}
+      />
     </div>
   );
 }

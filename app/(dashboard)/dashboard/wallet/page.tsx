@@ -2,6 +2,7 @@
 
 import { WalletHeader } from "@/components/wallet/wallet-header";
 import { MyWallet } from "@/components/wallet/my-wallet";
+import { MyTokens } from "@/components/wallet/my-tokens";
 import { TransactionsHistory } from "@/components/wallet/transactions-history";
 
 export default function WalletPage() {
@@ -12,6 +13,11 @@ export default function WalletPage() {
       {/* My Wallet Section */}
       <div className="rounded-xl border bg-white p-6 shadow-sm">
         <MyWallet />
+      </div>
+
+      {/* My Tokens Section */}
+      <div className="rounded-xl border bg-white p-6 shadow-sm">
+        <MyTokens />
       </div>
 
       {/* Transactions History */}
