@@ -9,7 +9,9 @@ import {
   Layout,
   ShieldCheck,
   FileText,
-  LucideIcon, FolderKanban,
+  LucideIcon,
+  FolderKanban,
+  FileCheck,
 } from "lucide-react";
 
 export interface NavItem {
@@ -32,6 +34,7 @@ export const lenderNavigationConfig: NavGroup[] = [
       { title: "My Proposals", href: "/dashboard/proposals", icon: FileText },
       { title: "Deals", href: "/dashboard/deals", icon: PieChart },
       { title: "Drawdown", href: "/dashboard/drawdown", icon: FolderKanban },
+      { title: "Audit Logs", href: "/dashboard/audit-logs", icon: FileCheck },
     ],
   },
   {

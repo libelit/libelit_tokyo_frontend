@@ -40,3 +40,13 @@ export {
   lenderSecurityPackageLabels,
   lenderProposalStatusConfig,
 } from "./lender";
+
+export type {
+  AuditLog,
+  AuditEventType,
+  AuditCategory,
+  AuditLogsListParams,
+  AuditLogsResponse,
+  BackendAuditLog,
+  BackendAuditLogsResponse,
+} from "./audit-logs";

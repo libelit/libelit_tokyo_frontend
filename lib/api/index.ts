@@ -34,3 +34,5 @@ export {
   lenderProjectPhotosService,
   lenderProposalsService,
 } from "./lender";
+
+export { auditLogsService } from "./audit-logs";

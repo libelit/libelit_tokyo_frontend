@@ -9,6 +9,7 @@ import {
   Layout,
   ShieldCheck,
   LucideIcon,
+  FileCheck,
 } from "lucide-react";
 
 export interface NavItem {
@@ -28,6 +29,7 @@ export const developerNavigationConfig: NavGroup[] = [
       { title: "KYB Verification", href: "/developer/dashboard/kyb", icon: ShieldCheck },
       { title: "Projects", href: "/developer/dashboard/projects", icon: Building2 },
       { title: "Drawdown", href: "/developer/dashboard/drawdown", icon: FolderKanban },
+      { title: "Audit Logs", href: "/developer/audit-logs", icon: FileCheck },
       // { title: "Analytics", href: "/developer/dashboard/analytics", icon: BarChart3 },
       // { title: "Documents", href: "/developer/dashboard/documents", icon: FileText },
     ],
