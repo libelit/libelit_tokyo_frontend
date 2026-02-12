@@ -1,8 +1,6 @@
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MobileSidebar } from "./sidebar";
-import {Bell} from "lucide-react";
 
 interface DashboardHeaderProps {
   title: string;
@@ -21,10 +19,6 @@ export function DashboardHeader({ title, subtitle }: DashboardHeaderProps) {
           )}
         </div>
       </div>
-
-      <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-        <Bell className="h-5 w-5 text-gray-600" />
-      </button>
     </header>
   );
 }
